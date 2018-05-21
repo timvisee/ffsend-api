@@ -13,10 +13,15 @@ categories = [
     "api-bindings",
     "authentication",
     "cryptography",
+    "network-programming",
 ]
 
 [badges]
 travis-ci = { repository = "timvisee/ffsend-api", branch = "master" }
+
+[lib]
+name = "ffsend_api"
+path = "src/lib.rs"
 
 [dependencies]
 arrayref = "0.3"
