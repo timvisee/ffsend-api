@@ -1,8 +1,22 @@
 [package]
 name = "ffsend-api"
-description = "A fully featured Firefox Send API client."
 version = "0.0.1"
 authors = ["Tim Visee <https://timvisee.com/>"]
+license = "MIT"
+readme = "README.md"
+homepage = "https://github.com/timvisee/ffsend-api"
+repository = "https://github.com/timvisee/ffsend-api"
+documentation = "https://docs.rs/ffsend-api"
+description = "A fully featured Firefox Send API client."
+keywords = ["send", "firefox", "api"]
+categories = [
+    "api-bindings",
+    "authentication",
+    "cryptography",
+]
+
+[badges]
+travis-ci = { repository = "timvisee/ffsend-api", branch = "master" }
 
 [dependencies]
 arrayref = "0.3"
