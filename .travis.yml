@@ -37,14 +37,16 @@ jobs:
       #   provider: releases
       #   api_key: $GITHUB_OAUTH_TOKEN
       #   skip_cleanup: true
-      #   on:
-      #     tags: true
     - stage: release
       script:
         - cargo package
         - echo "Dummy cargo publish"
-        # - cargo login SOME_TOKEN
+        # - echo $CARGO_TOKEN | cargo login
         # - cargo publish
+      addons: {}
+      rust: []
+
+cache: cargo
 
 # TODO: share build caches
 # TODO: only build releases when a version tag is specified
