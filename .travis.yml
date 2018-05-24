@@ -1,23 +1,50 @@
 # Configuration for Travis CI
 language: rust
 sudo: false
-rust:
-  - stable
-  - beta
-  - nightly
-matrix:
-  include:
-    - os: osx
-      rust: stable
 addons:
   apt:
     packages:
       - libssl-dev
 
-# Main build
-script:
-  # Default features configuration
-- cargo build --verbose --all
+stages:
+  - build
+  - test
+  - name: release
+    # if: tag =~ ^v(\d+\.)*\d+$
 
-  # Tests
-- cargo test --verbose --all
+jobs:
+  include:
+    - stage: build
+      rust:
+        - stable
+        - beta
+        - nightly
+      matrix:
+        include:
+          - os: osx
+            rust: stable
+      script: cargo build --verbose --all
+    - stage: test
+      script: cargo test --verbose --all
+    - stage: release
+      script: "echo Dummy release for GitHub"
+      # script: skip
+      # deploy:
+      #   provider: releases
+      #   api_key: $GITHUB_OAUTH_TOKEN
+      #   skip_cleanup: true
+      #   on:
+      #     tags: true
+    - stage: release
+      script:
+        - cargo package
+        - echo "Dummy cargo publish"
+        # - cargo login SOME_TOKEN
+        # - cargo publish
+
+# TODO: share build caches
+# TODO: only build releases when a version tag is specified
+# TODO: reenable GitHub releases
+# TODO: configure GitHub release oauth token
+# TODO: reenable cargo releases
+# TODO: configure cargo login token
