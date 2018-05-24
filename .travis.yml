@@ -15,15 +15,19 @@ stages:
 jobs:
   include:
     - stage: build
-      rust:
-        - stable
-        - beta
-        - nightly
-      matrix:
-        include:
-          - os: osx
-            rust: stable
-      script: cargo build --verbose --all
+      rust: stable
+      script: &build-script
+        - cargo build --verbose --all
+    - stage: build
+      rust: beta
+      script: *build-script
+    - stage: build
+      rust: nightly
+      script: *build-script
+    - stage: build
+      rust: stable
+      os: osx
+      script: *build-script
     - stage: test
       script: cargo test --verbose --all
     - stage: release
