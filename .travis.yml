@@ -38,10 +38,14 @@ jobs:
         provider: releases
         api_key: $GITHUB_OAUTH_TOKEN
         skip_cleanup: true
+        on:
+          tags: true
+          branch: master
     - stage: release
       script:
         - echo $CARGO_TOKEN | cargo login
         - cargo publish --verbose
+      cache: cargo
 
 # TODO: enfore the git tag/crate version equality for releases
 # TODO: disable addons/rust installation for GitHub release job
