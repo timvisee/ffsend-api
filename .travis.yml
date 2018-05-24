@@ -33,7 +33,6 @@ jobs:
       script: cargo test --verbose --all
       cache: cargo
     - stage: release
-      script: "echo Dummy release for GitHub"
       script: skip
       deploy:
         provider: releases
@@ -44,9 +43,5 @@ jobs:
         - echo $CARGO_TOKEN | cargo login
         - cargo publish --verbose
 
-# TODO: only build releases when a version tag is specified
-# TODO: reenable GitHub releases
-# TODO: configure GitHub release oauth token
-# TODO: reenable cargo releases
-# TODO: configure cargo login token
 # TODO: enfore the git tag/crate version equality for releases
+# TODO: disable addons/rust installation for GitHub release job
