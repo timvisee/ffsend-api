@@ -14,7 +14,7 @@ use reqwest::header::ContentLength;
 use api::url::UrlBuilder;
 use api::request::{ensure_success, ResponseError};
 use crypto::key_set::KeySet;
-use crypto::sig::signature_encoded;
+use crypto::sig::sign_encode;
 use file::remote_file::RemoteFile;
 use reader::{EncryptedFileWriter, ProgressReporter, ProgressWriter};
 use super::metadata::{
@@ -164,8 +164,7 @@ impl<'a> Download<'a> {
         client: &Client,
     ) -> Result<(Response, u64), DownloadError> {
         // Compute the cryptographic signature
-        let sig = signature_encoded(key.auth_key().unwrap(), &meta_nonce)
-            .map_err(|_| DownloadError::ComputeSignature)?;
+        let sig = sign_encode(key.auth_key().unwrap(), &meta_nonce);
 
         // Build and send the download request
         let response = client.get(UrlBuilder::api_download(self.file))
@@ -297,11 +296,6 @@ impl From<DownloadError> for Error {
 
 #[derive(Fail, Debug)]
 pub enum DownloadError {
-    /// An error occurred while computing the cryptographic signature used for
-    /// downloading the file.
-    #[fail(display = "failed to compute cryptographic signature")]
-    ComputeSignature,
-
     /// Sending the request to download the file failed.
     #[fail(display = "failed to request file download")]
     Request,

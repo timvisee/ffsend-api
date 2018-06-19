@@ -9,7 +9,7 @@ use api::request::{ensure_success, ResponseError};
 use api::url::UrlBuilder;
 use crypto::b64;
 use crypto::key_set::KeySet;
-use crypto::sig::signature_encoded;
+use crypto::sig::sign_encode;
 use file::metadata::Metadata as MetadataData;
 use file::remote_file::RemoteFile;
 use super::exists::{
@@ -95,8 +95,7 @@ impl<'a> Metadata<'a> {
         auth_nonce: &[u8],
     ) -> Result<MetadataResponse, MetaError> {
         // Compute the cryptographic signature for authentication
-        let sig = signature_encoded(key.auth_key().unwrap(), &auth_nonce)
-            .map_err(|_| MetaError::ComputeSignature)?;
+        let sig = sign_encode(key.auth_key().unwrap(), &auth_nonce);
 
         // Build the request, fetch the encrypted metadata
         let mut response = client.get(UrlBuilder::api_metadata(self.file))
@@ -290,11 +289,6 @@ pub enum RequestError {
 
 #[derive(Fail, Debug)]
 pub enum MetaError {
-    /// An error occurred while computing the cryptographic signature used for
-    /// decryption.
-    #[fail(display = "failed to compute cryptographic signature")]
-    ComputeSignature,
-
     /// Sending the request to gather the metadata encryption nonce failed.
     #[fail(display = "failed to request metadata nonce")]
     NonceRequest,
