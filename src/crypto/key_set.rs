@@ -3,7 +3,8 @@ use url::Url;
 
 use api::url::UrlBuilder;
 use file::remote_file::RemoteFile;
-use super::{b64, rand_bytes};
+use ring::rand::{SecureRandom, SystemRandom};
+use super::b64;
 use super::hdkf::{derive_auth_key, derive_file_key, derive_meta_key};
 
 /// The length of an input vector.
@@ -71,9 +72,10 @@ impl KeySet {
         let mut iv = [0u8; 12];
 
         // Generate the secrets
-        rand_bytes(&mut secret)
+        let rand = SystemRandom::new();
+        rand.fill(&mut secret)
             .expect("failed to generate crypto secure random secret");
-        rand_bytes(&mut iv)
+        rand.fill(&mut iv)
             .expect("failed to generate crypto secure random input vector");
 
         // Create the key
