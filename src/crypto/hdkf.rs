@@ -35,8 +35,8 @@ fn hkdf(
     let info = info.unwrap_or(&[]);
 
     // Derive a HKDF key with the given length
-    Hkdf::<Sha256>::new(&ikm, &[])
-        .derive(&info, length)
+    Hkdf::<Sha256>::extract(None, &ikm)
+        .expand(&info, length)
 }
 
 /// Derive a key to use for file data encryption, based on the given `secret`.
