@@ -2,9 +2,8 @@ extern crate hkdf;
 extern crate sha2;
 
 use self::hkdf::Hkdf;
-use openssl::hash::MessageDigest;
-use openssl::pkcs5::pbkdf2_hmac;
 use self::sha2::Sha256;
+use ring::{digest, pbkdf2};
 use url::Url;
 
 /// The length of the derived authentication key in bytes.
@@ -35,6 +34,7 @@ fn hkdf(
     let info = info.unwrap_or(&[]);
 
     // Derive a HKDF key with the given length
+    // TODO: replace this with the ring crate when possible
     Hkdf::<Sha256>::extract(None, &ikm)
         .expand(&info, length)
 }
@@ -67,15 +67,15 @@ pub fn derive_auth_key(secret: &[u8], password: Option<&str>, url: Option<&Url>)
     }
 
     // Derive a key with a password and URL
-    // TODO: do not expect/unwrap here
+    // TODO: fetch key length directly from used digest
     let mut key = vec![0u8; KEY_AUTH_SIZE];
-    pbkdf2_hmac(
-        password.unwrap().as_bytes(),
+    pbkdf2::derive(
+        &digest::SHA256,
+        KEY_AUTH_ITERATIONS as u32,
         url.unwrap().as_str().as_bytes(),
-        KEY_AUTH_ITERATIONS,
-        MessageDigest::sha256(),
+        password.unwrap().as_bytes(),
         &mut key,
-    ).expect("failed to derive passworded authentication key");
+    );
 
     key
 }

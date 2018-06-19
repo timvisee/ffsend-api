@@ -7,6 +7,7 @@ extern crate failure;
 extern crate failure_derive;
 extern crate mime_guess;
 extern crate openssl;
+extern crate ring;
 pub extern crate reqwest;
 extern crate serde;
 #[macro_use]
