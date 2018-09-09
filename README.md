@@ -1,5 +1,6 @@
 [![Build status on Travis CI][travis-master-badge]][travis-link]
 [![Newest release on crates.io][crate-version-badge]][crate-link]
+[![Documentation][docs-badge]][docs]
 [![Number of downloads on crates.io][crate-download-badge]][crate-link]
 [![Project license][crate-license-badge]](LICENSE)
 
@@ -9,6 +10,8 @@
 [crate-download-badge]: https://img.shields.io/crates/d/ffsend-api.svg
 [crate-version-badge]: https://img.shields.io/crates/v/ffsend-api.svg
 [crate-license-badge]: https://img.shields.io/crates/l/ffsend-api.svg
+[docs]: https://docs.rs/ffsend-api
+[docs-badge]: https://docs.rs/ffsend-api/badge.svg
 [travis-master-badge]: https://travis-ci.org/timvisee/ffsend-api.svg?branch=master
 [travis-link]: https://travis-ci.org/timvisee/ffsend-api
 [docs]: https://docs.rs/ffsend-api
