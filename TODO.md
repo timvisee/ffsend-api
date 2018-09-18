@@ -1,4 +1,5 @@
 # TODO
+- Somehow implement openssl_probe to prove for certificates
 - Trigger `ffsend` once `ffsend-api` succeeds
 - Rework encrypted reader/writer
 - API actions contain duplicate code, create centralized functions

@@ -4,8 +4,6 @@
 [![Number of downloads on crates.io][crate-download-badge]][crate-link]
 [![Project license][crate-license-badge]](LICENSE)
 
-[Documentation][docs]
-
 [crate-link]: https://crates.io/crates/ffsend-api
 [crate-download-badge]: https://img.shields.io/crates/d/ffsend-api.svg
 [crate-version-badge]: https://img.shields.io/crates/v/ffsend-api.svg
@@ -14,7 +12,6 @@
 [docs-badge]: https://docs.rs/ffsend-api/badge.svg
 [travis-master-badge]: https://travis-ci.org/timvisee/ffsend-api.svg?branch=master
 [travis-link]: https://travis-ci.org/timvisee/ffsend-api
-[docs]: https://docs.rs/ffsend-api
 
 # ffsend-api [WIP]
 > A fully featured [Firefox Send][send] API client written in Rust.
@@ -39,6 +36,7 @@ Please see the client project here: [ffsend][ffsend]
 This project is released under the MIT license.
 Check out the [LICENSE](LICENSE) file for more information.
 
+[docs]: https://docs.rs/ffsend-api
 [ffsend]: https://github.com/timvisee/ffsend
 [ffsend-usage-demo-asciinema]: https://asciinema.org/a/182225
 [ffsend-usage-demo-svg]: https://cdn.rawgit.com/timvisee/ffsend/6e8ef55b/res/demo.svg
