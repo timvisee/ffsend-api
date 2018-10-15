@@ -1,3 +1,5 @@
+extern crate mime;
+
 use std::fs::File;
 use std::io::{
     BufReader,
@@ -6,6 +8,7 @@ use std::io::{
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
+use crypto::b64;
 use mime_guess::{guess_mime_type, Mime};
 use openssl::symm::encrypt_aead;
 use reqwest::{
@@ -13,9 +16,9 @@ use reqwest::{
     Error as ReqwestError,
     Request,
 };
-use reqwest::header::Authorization;
-use reqwest::mime::APPLICATION_OCTET_STREAM;
+use reqwest::header::AUTHORIZATION;
 use reqwest::multipart::{Form, Part};
+use self::mime::APPLICATION_OCTET_STREAM;
 use url::{
     ParseError as UrlParseError,
     Url,
@@ -25,7 +28,7 @@ use api::nonce::header_nonce;
 use api::request::{ensure_success, ResponseError};
 use crypto::key_set::KeySet;
 use file::remote_file::RemoteFile;
-use file::metadata::{Metadata, XFileMetadata};
+use file::metadata::Metadata;
 use reader::{
     EncryptedFileReader,
     ExactLengthReader,
@@ -215,7 +218,8 @@ impl Upload {
 
         // Configure a form to send
         let part = Part::reader_with_length(reader, len)
-            .mime(APPLICATION_OCTET_STREAM);
+            .mime_str(APPLICATION_OCTET_STREAM.as_ref())
+            .expect("failed to set request mime");
         let form = Form::new()
             .part("data", part);
 
@@ -227,10 +231,8 @@ impl Upload {
         // Build the request
         // TODO: create an error for this unwrap
         client.post(url.as_str())
-            .header(Authorization(
-                format!("send-v1 {}", key.auth_key_encoded().unwrap())
-            ))
-            .header(XFileMetadata::from(&metadata))
+            .header(AUTHORIZATION.as_str(), format!("send-v1 {}", key.auth_key_encoded().unwrap()))
+            .header("X-File-Metadata", b64::encode(&metadata))
             .multipart(form)
             .build()
             .expect("failed to build an API request")

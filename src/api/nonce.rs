@@ -3,9 +3,10 @@ use reqwest::{Client, Response};
 
 use api::request::{ensure_success, ResponseError};
 use crypto::b64;
+use reqwest::header::{HeaderName, WWW_AUTHENTICATE};
 
 /// The name of the header the nonce is delivered in.
-const HEADER_NONCE: &str = "WWW-Authenticate";
+const HEADER_NONCE: HeaderName = WWW_AUTHENTICATE;
 
 /// Do a new request, and extract the nonce from a header in the given
 /// response.
@@ -31,13 +32,10 @@ pub fn header_nonce(response: &Response)
     // Get the authentication nonce
     b64::decode(
         response.headers()
-            .get_raw(HEADER_NONCE)
+            .get(HEADER_NONCE)
             .ok_or(NonceError::NoNonceHeader)?
-            .one()
-            .ok_or(NonceError::MalformedNonce)
-            .and_then(|line| String::from_utf8(line.to_vec())
-                .map_err(|_| NonceError::MalformedNonce)
-            )?
+            .to_str()
+            .map_err(|_| NonceError::MalformedNonce)?
             .split_terminator(' ')
             .nth(1)
             .ok_or(NonceError::MalformedNonce)?

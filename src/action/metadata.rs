@@ -1,7 +1,7 @@
 use failure::Error as FailureError;
 use openssl::symm::decrypt_aead;
 use reqwest::Client;
-use reqwest::header::Authorization;
+use reqwest::header::AUTHORIZATION;
 use serde_json;
 
 use api::nonce::{header_nonce, NonceError, request_nonce};
@@ -100,9 +100,7 @@ impl<'a> Metadata<'a> {
 
         // Build the request, fetch the encrypted metadata
         let mut response = client.get(UrlBuilder::api_metadata(self.file))
-            .header(Authorization(
-                format!("send-v1 {}", sig)
-            ))
+            .header(AUTHORIZATION.as_str(), format!("send-v1 {}", sig))
             .send()
             .map_err(|_| MetaError::NonceRequest)?;
 
