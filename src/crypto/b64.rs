@@ -6,13 +6,7 @@
 
 extern crate base64;
 
-pub use self::base64::{
-    CharacterSet,
-    Config,
-    DecodeError,
-    LineEnding,
-    LineWrap,
-};
+pub use self::base64::{CharacterSet, Config, DecodeError, LineEnding, LineWrap};
 
 /// Encode the given byte slice using base64,
 /// in an URL-safe manner without padding.
@@ -25,7 +19,8 @@ pub fn encode(input: &[u8]) -> String {
 /// padding is optional.
 pub fn decode(input: &str) -> Result<Vec<u8>, DecodeError> {
     base64::decode_config(
-        input.replace('+', "-")
+        input
+            .replace('+', "-")
             .replace('/', "_")
             .trim_right_matches('='),
         base64::URL_SAFE_NO_PAD,

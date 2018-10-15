@@ -1,10 +1,7 @@
 use reqwest::Client;
 
-use api::data::{
-    Error as DataError,
-    OwnedData,
-};
-use api::nonce::{NonceError, request_nonce};
+use api::data::{Error as DataError, OwnedData};
+use api::nonce::{request_nonce, NonceError};
 use api::request::{ensure_success, ResponseError};
 use api::url::UrlBuilder;
 use file::remote_file::RemoteFile;
@@ -35,11 +32,7 @@ pub struct Params<'a> {
 
 impl<'a> Params<'a> {
     /// Construct a new parameters action for the given remote file.
-    pub fn new(
-        file: &'a RemoteFile,
-        params: ParamsData,
-        nonce: Option<Vec<u8>>,
-    ) -> Self {
+    pub fn new(file: &'a RemoteFile, params: ParamsData, nonce: Option<Vec<u8>>) -> Self {
         Self {
             file,
             params,
@@ -65,31 +58,22 @@ impl<'a> Params<'a> {
     }
 
     /// Fetch the authentication nonce for the file from the remote server.
-    fn fetch_auth_nonce(&self, client: &Client)
-        -> Result<Vec<u8>, Error>
-    {
-        request_nonce(
-            client,
-            UrlBuilder::download(self.file, false),
-        ).map_err(|err| err.into())
+    fn fetch_auth_nonce(&self, client: &Client) -> Result<Vec<u8>, Error> {
+        request_nonce(client, UrlBuilder::download(self.file, false)).map_err(|err| err.into())
     }
 
     /// Send the request for changing the parameters.
-    fn change_params(
-        &self,
-        client: &Client,
-        data: &OwnedData<ParamsData>,
-    ) -> Result<(), Error> {
+    fn change_params(&self, client: &Client, data: &OwnedData<ParamsData>) -> Result<(), Error> {
         // Get the params URL, and send the change
         let url = UrlBuilder::api_params(self.file);
-        let response = client.post(url)
+        let response = client
+            .post(url)
             .json(&data)
             .send()
             .map_err(|_| ChangeError::Request)?;
 
         // Ensure the response is successful
-        ensure_success(&response)
-            .map_err(|err| err.into())
+        ensure_success(&response).map_err(|err| err.into())
     }
 }
 
@@ -114,9 +98,7 @@ impl ParamsData {
     /// Create a new parameters data object, with the given parameters.
     // TODO: the downloads must be between bounds
     pub fn from(download_limit: Option<u8>) -> Self {
-        ParamsData {
-            download_limit,
-        }
+        ParamsData { download_limit }
     }
 
     /// Set the maximum number of allowed downloads, after which the file
@@ -127,9 +109,10 @@ impl ParamsData {
     /// An error may be returned if the download value is out of the allowed
     /// bound. These bounds are fixed and enforced by the server.
     /// See `PARAMS_DOWNLOAD_MIN` and `PARAMS_DOWNLOAD_MAX`.
-    pub fn set_download_limit(&mut self, download_limit: Option<u8>)
-        -> Result<(), ParamsDataError>
-    {
+    pub fn set_download_limit(
+        &mut self,
+        download_limit: Option<u8>,
+    ) -> Result<(), ParamsDataError> {
         // Check the download limit bounds
         if let Some(d) = download_limit {
             if d < PARAMS_DOWNLOAD_MIN || d > PARAMS_DOWNLOAD_MAX {
@@ -191,7 +174,7 @@ impl From<PrepareError> for Error {
 }
 
 impl From<ChangeError> for Error {
-    fn from(err:ChangeError) -> Error {
+    fn from(err: ChangeError) -> Error {
         Error::Change(err)
     }
 }

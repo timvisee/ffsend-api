@@ -15,9 +15,7 @@ pub struct Exists<'a> {
 impl<'a> Exists<'a> {
     /// Construct a new exists action.
     pub fn new(file: &'a RemoteFile) -> Self {
-        Self {
-            file,
-        }
+        Self { file }
     }
 
     /// Invoke the exists action.
@@ -29,21 +27,18 @@ impl<'a> Exists<'a> {
     fn check_exists(&self, client: &Client) -> Result<ExistsResponse, Error> {
         // Get the download url, and parse the nonce
         let exists_url = UrlBuilder::api_exists(self.file);
-        let mut response = client.get(exists_url)
-            .send()
-            .map_err(|_| Error::Request)?;
+        let mut response = client.get(exists_url).send().map_err(|_| Error::Request)?;
 
         // Ensure the status code is succesful, check the expiry state
         match ensure_success(&response) {
-            Ok(_) => {},
-            Err(ResponseError::Expired) => return Ok(
-                ExistsResponse::new(false, false)
-            ),
+            Ok(_) => {}
+            Err(ResponseError::Expired) => return Ok(ExistsResponse::new(false, false)),
             Err(err) => return Err(Error::Response(err)),
         }
 
         // Parse the response
-        let mut response = response.json::<ExistsResponse>()
+        let mut response = response
+            .json::<ExistsResponse>()
             .map_err(|_| Error::Malformed)?;
         response.set_exists(true);
 

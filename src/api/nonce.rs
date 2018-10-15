@@ -1,5 +1,5 @@
-use url::Url;
 use reqwest::{Client, Response};
+use url::Url;
 
 use api::request::{ensure_success, ResponseError};
 use crypto::b64;
@@ -10,13 +10,9 @@ const HEADER_NONCE: HeaderName = WWW_AUTHENTICATE;
 
 /// Do a new request, and extract the nonce from a header in the given
 /// response.
-pub fn request_nonce(client: &Client, url: Url)
-    -> Result<Vec<u8>, NonceError>
-{
+pub fn request_nonce(client: &Client, url: Url) -> Result<Vec<u8>, NonceError> {
     // Make the request
-    let response = client.get(url)
-        .send()
-        .map_err(|_| NonceError::Request)?; 
+    let response = client.get(url).send().map_err(|_| NonceError::Request)?;
 
     // Ensure the response is successful
     ensure_success(&response)?;
@@ -26,20 +22,20 @@ pub fn request_nonce(client: &Client, url: Url)
 }
 
 /// Extract the nonce from a header in the given response.
-pub fn header_nonce(response: &Response)
-    -> Result<Vec<u8>, NonceError>
-{
+pub fn header_nonce(response: &Response) -> Result<Vec<u8>, NonceError> {
     // Get the authentication nonce
     b64::decode(
-        response.headers()
+        response
+            .headers()
             .get(HEADER_NONCE)
             .ok_or(NonceError::NoNonceHeader)?
             .to_str()
             .map_err(|_| NonceError::MalformedNonce)?
             .split_terminator(' ')
             .nth(1)
-            .ok_or(NonceError::MalformedNonce)?
-    ).map_err(|_| NonceError::MalformedNonce)
+            .ok_or(NonceError::MalformedNonce)?,
+    )
+    .map_err(|_| NonceError::MalformedNonce)
 }
 
 #[derive(Fail, Debug)]

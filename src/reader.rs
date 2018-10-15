@@ -1,20 +1,9 @@
 use std::cmp::{max, min};
 use std::fs::File;
-use std::io::{
-    self,
-    BufReader,
-    Cursor,
-    Error as IoError,
-    Read,
-    Write,
-};
+use std::io::{self, BufReader, Cursor, Error as IoError, Read, Write};
 use std::sync::{Arc, Mutex};
 
-use openssl::symm::{
-    Cipher,
-    Crypter,
-    Mode as CrypterMode,
-};
+use openssl::symm::{Cipher, Crypter, Mode as CrypterMode};
 
 /// The length in bytes of crytographic tags that are used.
 const TAG_LEN: usize = 16;
@@ -62,27 +51,18 @@ impl EncryptedFileReader {
     ///
     /// It is recommended to wrap this reader in some sort of buffer, such as:
     /// `std::io::BufReader`
-    pub fn new(file: File, cipher: Cipher, key: &[u8], iv: &[u8])
-        -> Result<Self, io::Error>
-    {
+    pub fn new(file: File, cipher: Cipher, key: &[u8], iv: &[u8]) -> Result<Self, io::Error> {
         // Build the crypter
-        let crypter = Crypter::new(
-            cipher,
-            CrypterMode::Encrypt,
-            key,
-            Some(iv),
-        )?;
+        let crypter = Crypter::new(cipher, CrypterMode::Encrypt, key, Some(iv))?;
 
         // Construct the encrypted reader
-        Ok(
-            EncryptedFileReader {
-                file,
-                cipher,
-                crypter,
-                tag: None,
-                internal_buf: Vec::new(),
-            }
-        )
+        Ok(EncryptedFileReader {
+            file,
+            cipher,
+            crypter,
+            tag: None,
+            internal_buf: Vec::new(),
+        })
     }
 
     /// Read data from the internal buffer if there is any data in it, into
@@ -256,17 +236,15 @@ pub struct ProgressReader<R> {
 impl<R: Read> ProgressReader<R> {
     /// Wrap the given reader with an exact length, in a progress reader.
     pub fn new(inner: R) -> Result<Self, IoError>
-        where
-            R: ExactLengthReader
+    where
+        R: ExactLengthReader,
     {
-        Ok(
-            Self {
-                len: inner.len()?,
-                inner,
-                progress: 0,
-                reporter: None,
-            }
-        )
+        Ok(Self {
+            len: inner.len()?,
+            inner,
+            progress: 0,
+            reporter: None,
+        })
     }
 
     /// Wrap the given reader with the given length in a progress reader.
@@ -404,29 +382,26 @@ impl EncryptedFileWriter {
     /// `len`, which includes both the file bytes and the appended tag.
     ///
     /// For decryption, a `cipher`, `key` and `iv` must also be given.
-    pub fn new(file: File, len: usize, cipher: Cipher, key: &[u8], iv: &[u8])
-        -> Result<Self, io::Error>
-    {
+    pub fn new(
+        file: File,
+        len: usize,
+        cipher: Cipher,
+        key: &[u8],
+        iv: &[u8],
+    ) -> Result<Self, io::Error> {
         // Build the crypter
-        let crypter = Crypter::new(
-            cipher,
-            CrypterMode::Decrypt,
-            key,
-            Some(iv),
-        )?;
+        let crypter = Crypter::new(cipher, CrypterMode::Decrypt, key, Some(iv))?;
 
         // Construct the encrypted reader
-        Ok(
-            EncryptedFileWriter {
-                file,
-                cur: 0,
-                len,
-                cipher,
-                crypter,
-                tag_buf: Vec::with_capacity(TAG_LEN),
-                verified: false,
-            }
-        )
+        Ok(EncryptedFileWriter {
+            file,
+            cur: 0,
+            len,
+            cipher,
+            crypter,
+            tag_buf: Vec::with_capacity(TAG_LEN),
+            verified: false,
+        })
     }
 
     /// Check wheher the complete tag is buffered.
@@ -477,10 +452,7 @@ impl Write for EncryptedFileWriter {
 
             // Decrypt bytes
             // TODO: catch error in below statement
-            let len = self.crypter.update(
-                file_buf,
-                &mut decrypted,
-            )?;
+            let len = self.crypter.update(file_buf, &mut decrypted)?;
 
             // Write to the file
             self.file.write_all(&decrypted[..len])?;
@@ -545,17 +517,15 @@ pub struct ProgressWriter<W> {
 impl<W: Write> ProgressWriter<W> {
     /// Wrap the given writer with an exact length, in a progress writer.
     pub fn new(inner: W) -> Result<Self, IoError>
-        where
-            W: ExactLengthReader
+    where
+        W: ExactLengthReader,
     {
-        Ok(
-            Self {
-                len: inner.len()?,
-                inner,
-                progress: 0,
-                reporter: None,
-            }
-        )
+        Ok(Self {
+            len: inner.len()?,
+            inner,
+            progress: 0,
+            reporter: None,
+        })
     }
 
     /// Wrap the given writer with the given length in a progress writer.

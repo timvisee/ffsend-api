@@ -18,7 +18,7 @@ pub struct Metadata {
     name: String,
 
     /// The file mimetype.
-    #[serde(rename="type")]
+    #[serde(rename = "type")]
     mime: String,
 }
 

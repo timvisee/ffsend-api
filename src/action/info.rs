@@ -1,15 +1,9 @@
 use std::cmp::max;
 
-use reqwest::{
-    Client,
-    Error as ReqwestError,
-};
+use reqwest::{Client, Error as ReqwestError};
 
-use api::data::{
-    Error as DataError,
-    OwnedData,
-};
-use api::nonce::{NonceError, request_nonce};
+use api::data::{Error as DataError, OwnedData};
+use api::nonce::{request_nonce, NonceError};
 use api::request::{ensure_success, ResponseError};
 use api::url::UrlBuilder;
 use file::remote_file::RemoteFile;
@@ -49,13 +43,8 @@ impl<'a> Info<'a> {
     }
 
     /// Fetch the authentication nonce for the file from the remote server.
-    fn fetch_auth_nonce(&self, client: &Client)
-        -> Result<Vec<u8>, Error>
-    {
-        request_nonce(
-            client,
-            UrlBuilder::download(self.file, false),
-        ).map_err(|err| err.into())
+    fn fetch_auth_nonce(&self, client: &Client) -> Result<Vec<u8>, Error> {
+        request_nonce(client, UrlBuilder::download(self.file, false)).map_err(|err| err.into())
     }
 
     /// Send the request for fetching the remote file info.
@@ -66,7 +55,8 @@ impl<'a> Info<'a> {
     ) -> Result<InfoResponse, Error> {
         // Get the info URL, and send the request
         let url = UrlBuilder::api_info(self.file);
-        let mut response = client.post(url)
+        let mut response = client
+            .post(url)
             .json(&data)
             .send()
             .map_err(|_| InfoError::Request)?;
@@ -88,7 +78,7 @@ impl<'a> Info<'a> {
 /// This object is currently empty, as no additional data is sent to the
 /// server.
 #[derive(Debug, Serialize, Default)]
-pub struct InfoData { }
+pub struct InfoData {}
 
 impl InfoData {
     /// Constructor.

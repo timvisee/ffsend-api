@@ -1,10 +1,10 @@
 use openssl::symm::Cipher;
 use url::Url;
 
+use super::hdkf::{derive_auth_key, derive_file_key, derive_meta_key};
+use super::{b64, rand_bytes};
 use api::url::UrlBuilder;
 use file::remote_file::RemoteFile;
-use super::{b64, rand_bytes};
-use super::hdkf::{derive_auth_key, derive_file_key, derive_meta_key};
 
 /// The length of an input vector.
 const KEY_IV_LEN: usize = 12;
@@ -45,10 +45,7 @@ impl KeySet {
     // TODO: supply a client instance as parameter
     pub fn from(file: &RemoteFile, password: Option<&String>) -> Self {
         // Create a new key set instance
-        let mut set = Self::new(
-            file.secret_raw().clone(),
-            [0; 12],
-        );
+        let mut set = Self::new(file.secret_raw().clone(), [0; 12]);
 
         // Derive all keys
         set.derive();
@@ -64,17 +61,15 @@ impl KeySet {
     /// Generate a secure new key.
     ///
     /// If `derive` is `true`, file, authentication and metadata keys will be
-    /// derived from the generated secret. 
+    /// derived from the generated secret.
     pub fn generate(derive: bool) -> Self {
         // Allocate two keys
         let mut secret = vec![0u8; 16];
         let mut iv = [0u8; 12];
 
         // Generate the secrets
-        rand_bytes(&mut secret)
-            .expect("failed to generate crypto secure random secret");
-        rand_bytes(&mut iv)
-            .expect("failed to generate crypto secure random input vector");
+        rand_bytes(&mut secret).expect("failed to generate crypto secure random secret");
+        rand_bytes(&mut iv).expect("failed to generate crypto secure random input vector");
 
         // Create the key
         let mut key = Self::new(secret, iv);
@@ -98,11 +93,7 @@ impl KeySet {
     /// Derive an authentication key, with the given password and file URL.
     /// This method does not derive a (new) file and metadata key.
     pub fn derive_auth_password(&mut self, pass: &str, url: &Url) {
-        self.auth_key = Some(derive_auth_key(
-            &self.secret,
-            Some(pass),
-            Some(url),
-        ));
+        self.auth_key = Some(derive_auth_key(&self.secret, Some(pass), Some(url)));
     }
 
     /// Get the secret key.
@@ -112,7 +103,7 @@ impl KeySet {
 
     /// Get the secret key as URL-safe base64 encoded string.
     pub fn secret_encoded(&self) -> String {
-       b64::encode(self.secret())
+        b64::encode(self.secret())
     }
 
     /// Get the input vector.

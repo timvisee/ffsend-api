@@ -27,8 +27,6 @@ pub fn signature(key: &[u8], data: &[u8]) -> Result<Vec<u8>, ErrorStack> {
 /// The resulting signature is encoded as base64 string in an URL-safe manner.
 ///
 /// If computing the signature failed, an error is returned.
-pub fn signature_encoded(key: &[u8], data: &[u8])
-    -> Result<String, ErrorStack>
-{
+pub fn signature_encoded(key: &[u8], data: &[u8]) -> Result<String, ErrorStack> {
     signature(key, data).map(|sig| b64::encode(&sig))
 }

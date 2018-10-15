@@ -2,9 +2,9 @@ extern crate hkdf;
 extern crate sha2;
 
 use self::hkdf::Hkdf;
+use self::sha2::Sha256;
 use openssl::hash::MessageDigest;
 use openssl::pkcs5::pbkdf2_hmac;
-use self::sha2::Sha256;
 use url::Url;
 
 /// The length of the derived authentication key in bytes.
@@ -26,11 +26,7 @@ const KEY_AUTH_ITERATIONS: usize = 100;
 /// # Returns
 /// The output keying material, with the length as as specified in the `length`
 /// argument.
-fn hkdf(
-    length: usize,
-    ikm: &[u8],
-    info: Option<&[u8]>,
-) -> Vec<u8> {
+fn hkdf(length: usize, ikm: &[u8], info: Option<&[u8]>) -> Vec<u8> {
     // Unwrap info or use empty info, define output key material
     let info = info.unwrap_or(&[]);
     let mut okm = vec![0u8; length];
@@ -79,7 +75,8 @@ pub fn derive_auth_key(secret: &[u8], password: Option<&str>, url: Option<&Url>)
         KEY_AUTH_ITERATIONS,
         MessageDigest::sha256(),
         &mut key,
-    ).expect("failed to derive passworded authentication key");
+    )
+    .expect("failed to derive passworded authentication key");
 
     key
 }

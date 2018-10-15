@@ -1,10 +1,7 @@
 use reqwest::Client;
 
-use api::data::{
-    Error as DataError,
-    OwnedData,
-};
-use api::nonce::{NonceError, request_nonce};
+use api::data::{Error as DataError, OwnedData};
+use api::nonce::{request_nonce, NonceError};
 use api::request::{ensure_success, ResponseError};
 use api::url::UrlBuilder;
 use file::remote_file::RemoteFile;
@@ -37,40 +34,29 @@ impl<'a> Delete<'a> {
 
         // Create owned data, to send to the server for authentication
         let data = OwnedData::from(DeleteData::new(), &self.file)
-            .map_err(|err| PrepareError::DeleteData(
-                DeleteDataError::Owned(err),
-            ))?;
+            .map_err(|err| PrepareError::DeleteData(DeleteDataError::Owned(err)))?;
 
         // Send the delete request
         self.request_delete(client, &data)
     }
 
     /// Fetch the authentication nonce for the file from the remote server.
-    fn fetch_auth_nonce(&self, client: &Client)
-        -> Result<Vec<u8>, Error>
-    {
-        request_nonce(
-            client,
-            UrlBuilder::download(self.file, false),
-        ).map_err(|err| err.into())
+    fn fetch_auth_nonce(&self, client: &Client) -> Result<Vec<u8>, Error> {
+        request_nonce(client, UrlBuilder::download(self.file, false)).map_err(|err| err.into())
     }
 
     /// Send a request to delete the remote file, with the given data.
-    fn request_delete(
-        &self,
-        client: &Client,
-        data: &OwnedData<DeleteData>,
-    ) -> Result<(), Error> {
+    fn request_delete(&self, client: &Client, data: &OwnedData<DeleteData>) -> Result<(), Error> {
         // Get the delete URL, and send the request
         let url = UrlBuilder::api_delete(self.file);
-        let response = client.post(url)
+        let response = client
+            .post(url)
             .json(&data)
             .send()
             .map_err(|_| DeleteError::Request)?;
 
         // Ensure the status code is succesful
-        ensure_success(&response)
-            .map_err(|err| err.into())
+        ensure_success(&response).map_err(|err| err.into())
     }
 }
 
@@ -78,7 +64,7 @@ impl<'a> Delete<'a> {
 /// This object is currently empty, as no additional data is sent to the
 /// server.
 #[derive(Debug, Serialize, Default)]
-pub struct DeleteData { }
+pub struct DeleteData {}
 
 impl DeleteData {
     /// Constructor.

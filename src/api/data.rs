@@ -17,28 +17,21 @@ pub struct OwnedData<D> {
 }
 
 impl<D> OwnedData<D>
-    where
-        D: Serialize,
+where
+    D: Serialize,
 {
     /// Constructor.
     pub fn new(owner_token: String, inner: D) -> Self {
-        OwnedData {
-            owner_token,
-            inner,
-        }
+        OwnedData { owner_token, inner }
     }
 
     /// Wrap the given data structure with this owned data structure.
     /// A `file` must be given, having a set owner token.
     pub fn from(inner: D, file: &RemoteFile) -> Result<Self, Error> {
-        Ok(
-            Self::new(
-                file.owner_token()
-                    .ok_or(Error::NoOwnerToken)?
-                    .to_owned(),
-                inner,
-            )
-        )
+        Ok(Self::new(
+            file.owner_token().ok_or(Error::NoOwnerToken)?.to_owned(),
+            inner,
+        ))
     }
 }
 

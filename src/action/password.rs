@@ -1,10 +1,7 @@
 use reqwest::Client;
 
-use api::data::{
-    Error as DataError,
-    OwnedData,
-};
-use api::nonce::{NonceError, request_nonce};
+use api::data::{Error as DataError, OwnedData};
+use api::nonce::{request_nonce, NonceError};
 use api::request::{ensure_success, ResponseError};
 use api::url::UrlBuilder;
 use crypto::key_set::KeySet;
@@ -25,11 +22,7 @@ pub struct Password<'a> {
 
 impl<'a> Password<'a> {
     /// Construct a new password action for the given remote file.
-    pub fn new(
-        file: &'a RemoteFile,
-        password: &'a str,
-        nonce: Option<Vec<u8>>,
-    ) -> Self {
+    pub fn new(file: &'a RemoteFile, password: &'a str, nonce: Option<Vec<u8>>) -> Self {
         Self {
             file,
             password,
@@ -59,13 +52,8 @@ impl<'a> Password<'a> {
     }
 
     /// Fetch the authentication nonce for the file from the Send server.
-    fn fetch_auth_nonce(&self, client: &Client)
-        -> Result<Vec<u8>, Error>
-    {
-        request_nonce(
-            client,
-            UrlBuilder::download(self.file, false),
-        ).map_err(|err| err.into())
+    fn fetch_auth_nonce(&self, client: &Client) -> Result<Vec<u8>, Error> {
+        request_nonce(client, UrlBuilder::download(self.file, false)).map_err(|err| err.into())
     }
 
     /// Send the request for changing the file password.
@@ -76,14 +64,14 @@ impl<'a> Password<'a> {
     ) -> Result<(), Error> {
         // Get the password URL, and send the change
         let url = UrlBuilder::api_password(self.file);
-        let response = client.post(url)
+        let response = client
+            .post(url)
             .json(&data)
             .send()
             .map_err(|_| ChangeError::Request)?;
 
         // Ensure the response is successful
-        ensure_success(&response)
-            .map_err(|err| err.into())
+        ensure_success(&response).map_err(|err| err.into())
     }
 }
 

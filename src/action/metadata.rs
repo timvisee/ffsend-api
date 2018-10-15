@@ -1,10 +1,11 @@
 use failure::Error as FailureError;
 use openssl::symm::decrypt_aead;
-use reqwest::Client;
 use reqwest::header::AUTHORIZATION;
+use reqwest::Client;
 use serde_json;
 
-use api::nonce::{header_nonce, NonceError, request_nonce};
+use super::exists::{Error as ExistsError, Exists as ExistsAction};
+use api::nonce::{header_nonce, request_nonce, NonceError};
 use api::request::{ensure_success, ResponseError};
 use api::url::UrlBuilder;
 use crypto::b64;
@@ -12,10 +13,6 @@ use crypto::key_set::KeySet;
 use crypto::sig::signature_encoded;
 use file::metadata::Metadata as MetadataData;
 use file::remote_file::RemoteFile;
-use super::exists::{
-    Error as ExistsError,
-    Exists as ExistsAction,
-};
 
 /// An action to fetch file metadata.
 pub struct Metadata<'a> {
@@ -31,11 +28,7 @@ pub struct Metadata<'a> {
 
 impl<'a> Metadata<'a> {
     /// Construct a new metadata action.
-    pub fn new(
-        file: &'a RemoteFile,
-        password: Option<String>,
-        check_exists: bool,
-    ) -> Self {
+    pub fn new(file: &'a RemoteFile, password: Option<String>, check_exists: bool) -> Self {
         Self {
             file,
             password,
@@ -47,8 +40,7 @@ impl<'a> Metadata<'a> {
     pub fn invoke(self, client: &Client) -> Result<MetadataResponse, Error> {
         // Make sure the given file exists
         if self.check_exists {
-            let exist_response = ExistsAction::new(&self.file)
-                .invoke(&client)?;
+            let exist_response = ExistsAction::new(&self.file).invoke(&client)?;
 
             // Return an error if the file does not exist
             if !exist_response.exists() {
@@ -73,13 +65,8 @@ impl<'a> Metadata<'a> {
     }
 
     /// Fetch the authentication nonce for the file from the remote server.
-    fn fetch_auth_nonce(&self, client: &Client)
-        -> Result<Vec<u8>, Error>
-    {
-        request_nonce(
-            client,
-            UrlBuilder::download(self.file, false),
-        ).map_err(|err| err.into())
+    fn fetch_auth_nonce(&self, client: &Client) -> Result<Vec<u8>, Error> {
+        request_nonce(client, UrlBuilder::download(self.file, false)).map_err(|err| err.into())
     }
 
     /// Create a metadata nonce, and fetch the metadata for the file from the
@@ -99,26 +86,27 @@ impl<'a> Metadata<'a> {
             .map_err(|_| MetaError::ComputeSignature)?;
 
         // Build the request, fetch the encrypted metadata
-        let mut response = client.get(UrlBuilder::api_metadata(self.file))
+        let mut response = client
+            .get(UrlBuilder::api_metadata(self.file))
             .header(AUTHORIZATION.as_str(), format!("send-v1 {}", sig))
             .send()
             .map_err(|_| MetaError::NonceRequest)?;
 
         // Ensure the status code is successful
-        ensure_success(&response)
-            .map_err(MetaError::NonceResponse)?;
+        ensure_success(&response).map_err(MetaError::NonceResponse)?;
 
         // Get the metadata nonce
-        let nonce = header_nonce(&response)
-            .map_err(MetaError::Nonce)?;
+        let nonce = header_nonce(&response).map_err(MetaError::Nonce)?;
 
         // Parse the metadata response
         MetadataResponse::from(
-            &response.json::<RawMetadataResponse>()
+            &response
+                .json::<RawMetadataResponse>()
                 .map_err(|_| MetaError::Malformed)?,
             &key,
             nonce,
-        ).map_err(|_| MetaError::Decrypt)
+        )
+        .map_err(|_| MetaError::Decrypt)
     }
 }
 
@@ -150,14 +138,14 @@ impl RawMetadataResponse {
         assert_eq!(tag.len(), 16);
 
         // Decrypt the metadata
-		let meta = decrypt_aead(
-			KeySet::cipher(),
-			key_set.meta_key().unwrap(),
-			Some(key_set.iv()),
-			&[],
-			encrypted,
-			&tag,
-		)?;
+        let meta = decrypt_aead(
+            KeySet::cipher(),
+            key_set.meta_key().unwrap(),
+            Some(key_set.iv()),
+            &[],
+            encrypted,
+            &tag,
+        )?;
 
         // Parse the metadata, and return
         Ok(serde_json::from_slice(&meta)?)
@@ -197,16 +185,12 @@ impl<'a> MetadataResponse {
     //
     // This internally decrypts the metadata from the raw response.
     // An error is returned if decrypting the metadata failed.
-    pub fn from(raw: &RawMetadataResponse, key_set: &KeySet, nonce: Vec<u8>)
-        -> Result<Self, FailureError>
-    {
-        Ok(
-            Self::new(
-                raw.decrypt_metadata(key_set)?,
-                raw.size(),
-                nonce,
-            )
-        )
+    pub fn from(
+        raw: &RawMetadataResponse,
+        key_set: &KeySet,
+        nonce: Vec<u8>,
+    ) -> Result<Self, FailureError> {
+        Ok(Self::new(raw.decrypt_metadata(key_set)?, raw.size(), nonce))
     }
 
     /// Get the metadata.

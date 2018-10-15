@@ -1,13 +1,10 @@
 extern crate chrono;
 extern crate regex;
 
-use api::url::UrlBuilder;
-use url::{
-    ParseError as UrlParseError,
-    Url,
-};
 use self::chrono::{DateTime, Duration, Utc};
 use self::regex::Regex;
+use api::url::UrlBuilder;
+use url::{ParseError as UrlParseError, Url};
 use url_serde;
 
 use config::SEND_DEFAULT_EXPIRE_TIME;
@@ -69,9 +66,8 @@ impl RemoteFile {
     ) -> Self {
         // Assign the default expiry time if uncetain
         let expire_uncertain = expire_at.is_none();
-        let expire_at = expire_at.unwrap_or(
-            Utc::now() + Duration::seconds(SEND_DEFAULT_EXPIRE_TIME)
-        );
+        let expire_at =
+            expire_at.unwrap_or(Utc::now() + Duration::seconds(SEND_DEFAULT_EXPIRE_TIME));
 
         // Build the object
         Self {
@@ -87,7 +83,7 @@ impl RemoteFile {
     }
 
     /// Construct a new file, that was created at this exact time.
-    /// This will set the file expiration time 
+    /// This will set the file expiration time
     pub fn new_now(
         id: String,
         host: Url,
@@ -121,9 +117,7 @@ impl RemoteFile {
     /// manually.
     ///
     /// An optional owner token may be given.
-    pub fn parse_url(url: Url, owner_token: Option<String>)
-        -> Result<RemoteFile, FileParseError>
-    {
+    pub fn parse_url(url: Url, owner_token: Option<String>) -> Result<RemoteFile, FileParseError> {
         // Build the host
         let mut host = url.clone();
         host.set_fragment(None);
@@ -132,7 +126,8 @@ impl RemoteFile {
 
         // Validate the path, get the file ID
         let re_path = Regex::new(SHARE_PATH_PATTERN).unwrap();
-        let id = re_path.captures(url.path())
+        let id = re_path
+            .captures(url.path())
             .ok_or(FileParseError::InvalidUrl)?[1]
             .trim()
             .to_owned();
@@ -141,25 +136,18 @@ impl RemoteFile {
         let mut secret = Vec::new();
         if let Some(fragment) = url.fragment() {
             let re_fragment = Regex::new(SHARE_FRAGMENT_PATTERN).unwrap();
-            if let Some(raw) = re_fragment.captures(fragment)
+            if let Some(raw) = re_fragment
+                .captures(fragment)
                 .ok_or(FileParseError::InvalidSecret)?
                 .get(1)
             {
-                secret = b64::decode(raw.as_str().trim())
-                        .map_err(|_| FileParseError::InvalidSecret)?
+                secret =
+                    b64::decode(raw.as_str().trim()).map_err(|_| FileParseError::InvalidSecret)?
             }
         }
 
         // Construct the file
-        Ok(Self::new(
-            id,
-            None,
-            None,
-            host,
-            url,
-            secret,
-            owner_token,
-        ))
+        Ok(Self::new(id, None, None, host, url, secret, owner_token))
     }
 
     /// Get the file ID.

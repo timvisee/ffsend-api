@@ -1,49 +1,27 @@
 extern crate mime;
 
 use std::fs::File;
-use std::io::{
-    BufReader,
-    Error as IoError,
-};
+use std::io::{BufReader, Error as IoError};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
+use self::mime::APPLICATION_OCTET_STREAM;
 use crypto::b64;
 use mime_guess::{guess_mime_type, Mime};
 use openssl::symm::encrypt_aead;
-use reqwest::{
-    Client, 
-    Error as ReqwestError,
-    Request,
-};
 use reqwest::header::AUTHORIZATION;
 use reqwest::multipart::{Form, Part};
-use self::mime::APPLICATION_OCTET_STREAM;
-use url::{
-    ParseError as UrlParseError,
-    Url,
-};
+use reqwest::{Client, Error as ReqwestError, Request};
+use url::{ParseError as UrlParseError, Url};
 
+use super::params::{Error as ParamsError, Params, ParamsData};
+use super::password::{Error as PasswordError, Password};
 use api::nonce::header_nonce;
 use api::request::{ensure_success, ResponseError};
 use crypto::key_set::KeySet;
-use file::remote_file::RemoteFile;
 use file::metadata::Metadata;
-use reader::{
-    EncryptedFileReader,
-    ExactLengthReader,
-    ProgressReader,
-    ProgressReporter,
-};
-use super::params::{
-    Error as ParamsError,
-    Params,
-    ParamsData,
-};
-use super::password::{
-    Error as PasswordError,
-    Password,
-};
+use file::remote_file::RemoteFile;
+use reader::{EncryptedFileReader, ExactLengthReader, ProgressReader, ProgressReporter};
 
 type EncryptedReader = ProgressReader<BufReader<EncryptedFileReader>>;
 
@@ -101,15 +79,11 @@ impl Upload {
         let reader_len = reader.len().unwrap();
 
         // Create the request to send
-        let req = self.create_request(
-            client,
-            &key,
-            &metadata,
-            reader,
-        );
+        let req = self.create_request(client, &key, &metadata, reader);
 
         // Start the reporter
-        reporter.lock()
+        reporter
+            .lock()
             .map_err(|_| UploadError::Progress)?
             .start(reader_len);
 
@@ -117,9 +91,7 @@ impl Upload {
         let (result, nonce) = self.execute_request(req, client, &key)?;
 
         // Mark the reporter as finished
-        reporter.lock()
-            .map_err(|_| UploadError::Progress)?
-            .finish();
+        reporter.lock().map_err(|_| UploadError::Progress)?.finish();
 
         // Change the password if set
         if let Some(password) = self.password {
@@ -135,19 +107,14 @@ impl Upload {
     }
 
     /// Create a blob of encrypted metadata.
-    fn create_metadata(&self, key: &KeySet, file: &FileData)
-        -> Result<Vec<u8>, MetaError>
-    {
+    fn create_metadata(&self, key: &KeySet, file: &FileData) -> Result<Vec<u8>, MetaError> {
         // Determine what filename to use
-        let name = self.name.clone()
-            .unwrap_or_else(|| file.name().to_owned());
+        let name = self.name.clone().unwrap_or_else(|| file.name().to_owned());
 
         // Construct the metadata
-        let metadata = Metadata::from(
-            key.iv(),
-            name,
-            &file.mime(),
-        ).to_json().into_bytes();
+        let metadata = Metadata::from(key.iv(), name, &file.mime())
+            .to_json()
+            .into_bytes();
 
         // Encrypt the metadata
         let mut metadata_tag = vec![0u8; 16];
@@ -196,8 +163,7 @@ impl Upload {
         let reader = BufReader::new(reader);
 
         // Wrap into the encrypted reader
-        let mut reader = ProgressReader::new(reader)
-            .map_err(|_| ReaderError::Progress)?;
+        let mut reader = ProgressReader::new(reader).map_err(|_| ReaderError::Progress)?;
 
         // Initialize and attach the reporter
         reader.set_reporter(reporter);
@@ -220,18 +186,20 @@ impl Upload {
         let part = Part::reader_with_length(reader, len)
             .mime_str(APPLICATION_OCTET_STREAM.as_ref())
             .expect("failed to set request mime");
-        let form = Form::new()
-            .part("data", part);
+        let form = Form::new().part("data", part);
 
         // Define the URL to call
         // TODO: create an error for this unwrap
-        let url = self.host.join("api/upload")
-            .expect("invalid host");
+        let url = self.host.join("api/upload").expect("invalid host");
 
         // Build the request
         // TODO: create an error for this unwrap
-        client.post(url.as_str())
-            .header(AUTHORIZATION.as_str(), format!("send-v1 {}", key.auth_key_encoded().unwrap()))
+        client
+            .post(url.as_str())
+            .header(
+                AUTHORIZATION.as_str(),
+                format!("send-v1 {}", key.auth_key_encoded().unwrap()),
+            )
             .header("X-File-Metadata", b64::encode(&metadata))
             .multipart(form)
             .build()
@@ -240,9 +208,12 @@ impl Upload {
 
     /// Execute the given request, and create a file object that represents the
     /// uploaded file.
-    fn execute_request(&self, req: Request, client: &Client, key: &KeySet) 
-        -> Result<(RemoteFile, Option<Vec<u8>>), UploadError>
-    {
+    fn execute_request(
+        &self,
+        req: Request,
+        client: &Client,
+        key: &KeySet,
+    ) -> Result<(RemoteFile, Option<Vec<u8>>), UploadError> {
         // Execute the request
         let mut response = match client.execute(req) {
             Ok(response) => response,
@@ -251,8 +222,7 @@ impl Upload {
         };
 
         // Ensure the response is successful
-        ensure_success(&response)
-            .map_err(UploadError::Response)?;
+        ensure_success(&response).map_err(UploadError::Response)?;
 
         // Try to get the nonce, don't error on failure
         let nonce = header_nonce(&response).ok();
@@ -264,10 +234,7 @@ impl Upload {
         };
 
         // Transform the responce into a file object
-        Ok((
-            response.into_file(self.host.clone(), &key)?,
-            nonce,
-        ))
+        Ok((response.into_file(self.host.clone(), &key)?, nonce))
     }
 }
 
@@ -296,18 +263,14 @@ impl UploadResponse {
     /// Convert this response into a file object.
     ///
     /// The `host` and `key` must be given.
-    pub fn into_file(self, host: Url, key: &KeySet)
-        -> Result<RemoteFile, UploadError>
-    {
-        Ok(
-            RemoteFile::new_now(
-                self.id,
-                host,
-                Url::parse(&self.url)?,
-                key.secret().to_vec(),
-                Some(self.owner),
-            )
-        )
+    pub fn into_file(self, host: Url, key: &KeySet) -> Result<RemoteFile, UploadError> {
+        Ok(RemoteFile::new_now(
+            self.id,
+            host,
+            Url::parse(&self.url)?,
+            key.secret().to_vec(),
+            Some(self.owner),
+        ))
     }
 }
 
@@ -335,12 +298,10 @@ impl<'a> FileData<'a> {
             None => "file",
         };
 
-        Ok(
-            Self {
-                name,
-                mime: guess_mime_type(path),
-            }
-        )
+        Ok(Self {
+            name,
+            mime: guess_mime_type(path),
+        })
     }
 
     /// Get the file name.

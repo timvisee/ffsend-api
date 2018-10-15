@@ -1,26 +1,18 @@
 use std::fs::File;
-use std::io::{
-    self,
-    Error as IoError,
-    Read,
-};
+use std::io::{self, Error as IoError, Read};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use reqwest::{Client, Response};
 use reqwest::header::{AUTHORIZATION, CONTENT_LENGTH};
+use reqwest::{Client, Response};
 
-use api::url::UrlBuilder;
+use super::metadata::{Error as MetadataError, Metadata as MetadataAction, MetadataResponse};
 use api::request::{ensure_success, ResponseError};
+use api::url::UrlBuilder;
 use crypto::key_set::KeySet;
 use crypto::sig::signature_encoded;
 use file::remote_file::RemoteFile;
 use reader::{EncryptedFileWriter, ProgressReporter, ProgressWriter};
-use super::metadata::{
-    Error as MetadataError,
-    Metadata as MetadataAction,
-    MetadataResponse,
-};
 
 /// A file upload action to a Send server.
 pub struct Download<'a> {
@@ -73,15 +65,11 @@ impl<'a> Download<'a> {
         // Get the metadata, or fetch the file metadata,
         // then update the input vector in the key set
         let metadata: MetadataResponse = if self.metadata_response.is_some() {
-                self.metadata_response.take().unwrap()
-            } else {
-                MetadataAction::new(
-                        self.file,
-                        self.password.clone(),
-                        self.check_exists,
-                    )
-                    .invoke(&client)?
-            };
+            self.metadata_response.take().unwrap()
+        } else {
+            MetadataAction::new(self.file, self.password.clone(), self.check_exists)
+                .invoke(&client)?
+        };
         key.set_iv(metadata.metadata().iv());
 
         // Decide what actual file target to use
@@ -92,25 +80,15 @@ impl<'a> Download<'a> {
         // TODO: this should become a temporary file first
         // TODO: use the uploaded file name as default
         let out = File::create(path)
-            .map_err(|err| Error::File(
-                path_str.clone(),
-                FileError::Create(err),
-            ))?;
+            .map_err(|err| Error::File(path_str.clone(), FileError::Create(err)))?;
 
         // Create the file reader for downloading
-        let (reader, len) = self.create_file_reader(
-            &key,
-            metadata.nonce(),
-            &client,
-        )?;
+        let (reader, len) = self.create_file_reader(&key, metadata.nonce(), &client)?;
 
         // Create the file writer
-        let writer = self.create_file_writer(
-            out,
-            len,
-            &key,
-            &reporter,
-        ).map_err(|err| Error::File(path_str.clone(), err))?;
+        let writer = self
+            .create_file_writer(out, len, &key, &reporter)
+            .map_err(|err| Error::File(path_str.clone(), err))?;
 
         // Download the file
         self.download(reader, writer, len, &reporter)?;
@@ -167,18 +145,20 @@ impl<'a> Download<'a> {
             .map_err(|_| DownloadError::ComputeSignature)?;
 
         // Build and send the download request
-        let response = client.get(UrlBuilder::api_download(self.file))
+        let response = client
+            .get(UrlBuilder::api_download(self.file))
             .header(AUTHORIZATION.as_str(), format!("send-v1 {}", sig))
             .send()
             .map_err(|_| DownloadError::Request)?;
 
         // Ensure the response is succesful
-        ensure_success(&response)
-            .map_err(DownloadError::Response)?;
+        ensure_success(&response).map_err(DownloadError::Response)?;
 
         // Get the content length
         // TODO: make sure there is enough disk space
-        let len = response.headers().get(CONTENT_LENGTH)
+        let len = response
+            .headers()
+            .get(CONTENT_LENGTH)
             .ok_or(DownloadError::NoLength)?
             .to_str()
             .map_err(|_| DownloadError::NoLength)?
@@ -207,8 +187,10 @@ impl<'a> Download<'a> {
                 KeySet::cipher(),
                 key.file_key().unwrap(),
                 key.iv(),
-            ).map_err(|_| FileError::EncryptedWriter)?
-        ).map_err(|_| FileError::EncryptedWriter)?;
+            )
+            .map_err(|_| FileError::EncryptedWriter)?,
+        )
+        .map_err(|_| FileError::EncryptedWriter)?;
 
         // Set the reporter
         writer.set_reporter(reporter.clone());
@@ -227,16 +209,17 @@ impl<'a> Download<'a> {
         reporter: &Arc<Mutex<ProgressReporter>>,
     ) -> Result<(), DownloadError> {
         // Start the writer
-        reporter.lock()
+        reporter
+            .lock()
             .map_err(|_| DownloadError::Progress)?
             .start(len);
 
         // Write to the output file
-        io::copy(&mut reader, &mut writer)
-            .map_err(|_| DownloadError::Download)?;
+        io::copy(&mut reader, &mut writer).map_err(|_| DownloadError::Download)?;
 
         // Finish
-        reporter.lock()
+        reporter
+            .lock()
             .map_err(|_| DownloadError::Progress)?
             .finish();
 
