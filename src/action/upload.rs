@@ -13,7 +13,7 @@ use reqwest::{
     Error as ReqwestError,
     Request,
 };
-use reqwest::header::Authorization;
+use reqwest::header::AUTHORIZATION;
 use reqwest::mime::APPLICATION_OCTET_STREAM;
 use reqwest::multipart::{Form, Part};
 use url::{
@@ -227,7 +227,7 @@ impl Upload {
         // Build the request
         // TODO: create an error for this unwrap
         client.post(url.as_str())
-            .header(Authorization(
+            .header(AUTHORIZATION(
                 format!("send-v1 {}", key.auth_key_encoded().unwrap())
             ))
             .header(XFileMetadata::from(&metadata))
