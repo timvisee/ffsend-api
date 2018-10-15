@@ -49,8 +49,3 @@ url_serde = "0.2"
 [patch.crates-io.hkdf]
 git = "https://github.com/timvisee/KDFs.git"
 rev = "277cf5d"
-
-# Patch until an reqwest update is released
-[patch.crates-io.reqwest]
-git = "https://github.com/timvisee/reqwest.git"
-rev = "120c88f"
