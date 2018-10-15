@@ -31,12 +31,16 @@ fn hkdf(
     ikm: &[u8],
     info: Option<&[u8]>,
 ) -> Vec<u8> {
-    // Unwrap info or use empty info
+    // Unwrap info or use empty info, define output key material
     let info = info.unwrap_or(&[]);
+    let mut okm = vec![0u8; length];
 
     // Derive a HKDF key with the given length
     Hkdf::<Sha256>::extract(None, &ikm)
-        .expand(&info, length)
+        .expand(&info, &mut okm)
+        .unwrap();
+
+    okm
 }
 
 /// Derive a key to use for file data encryption, based on the given `secret`.

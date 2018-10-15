@@ -30,7 +30,7 @@ chrono = {version = "0.4", features = ["serde"]}
 derive_builder = "0.6"
 failure = "0.1"
 failure_derive = "0.1"
-hkdf = "0.5"
+hkdf = "0.6"
 hyper = "0.11.9" # same as reqwest
 mime_guess = "2.0.0-alpha.4"
 openssl = "0.10"
