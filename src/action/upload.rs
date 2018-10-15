@@ -1,3 +1,5 @@
+extern crate mime;
+
 use std::fs::File;
 use std::io::{
     BufReader,
@@ -14,8 +16,8 @@ use reqwest::{
     Request,
 };
 use reqwest::header::AUTHORIZATION;
-use reqwest::mime::APPLICATION_OCTET_STREAM;
 use reqwest::multipart::{Form, Part};
+use self::mime::APPLICATION_OCTET_STREAM;
 use url::{
     ParseError as UrlParseError,
     Url,
