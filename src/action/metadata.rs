@@ -100,9 +100,7 @@ impl<'a> Metadata<'a> {
 
         // Build the request, fetch the encrypted metadata
         let mut response = client.get(UrlBuilder::api_metadata(self.file))
-            .header(AUTHORIZATION(
-                format!("send-v1 {}", sig)
-            ))
+            .header(AUTHORIZATION.as_str(), format!("send-v1 {}", sig))
             .send()
             .map_err(|_| MetaError::NonceRequest)?;
 

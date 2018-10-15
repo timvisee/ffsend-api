@@ -7,10 +7,10 @@ pub const SEND_DEFAULT_HOST: &str = "https://send.firefox.com/";
 pub const SEND_DEFAULT_EXPIRE_TIME: i64 = 24 * 60 * 60;
 
 /// The HTTP status code that is returned for expired or non existant files.
-pub const HTTP_STATUS_EXPIRED: StatusCode = StatusCode::NotFound;
+pub const HTTP_STATUS_EXPIRED: StatusCode = StatusCode::NOT_FOUND;
 
 /// The HTTP status code that is returned on authentication failure.
-pub const HTTP_STATUS_UNAUTHORIZED: StatusCode = StatusCode::Unauthorized;
+pub const HTTP_STATUS_UNAUTHORIZED: StatusCode = StatusCode::UNAUTHORIZED;
 
 /// The recommended maximum upload size in bytes.
 pub const UPLOAD_SIZE_MAX_RECOMMENDED: u64 = 1024 * 1024 * 1024;

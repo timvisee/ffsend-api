@@ -1,14 +1,6 @@
 extern crate hyper;
 
-use std::fmt;
-
 use mime_guess::Mime;
-use reqwest::header::{
-    Formatter as HeaderFormatter,
-    Header,
-    Raw,
-};
-use self::hyper::error::Error as HyperError;
 use serde_json;
 
 use crypto::b64;
@@ -76,42 +68,5 @@ impl Metadata {
      */
     pub fn is_archive(&self) -> bool {
         self.mime.to_lowercase() == MIME_TAR.to_lowercase()
-    }
-}
-
-/// A X-File-Metadata header for reqwest, that is used to pass encrypted
-/// metadata to the server.
-///
-/// The encrypted metadata (bytes) is base64 encoded when constructing this
-/// header using `from`.
-#[derive(Clone)]
-pub struct XFileMetadata {
-    /// The metadata, as a base64 encoded string.
-    metadata: String,
-}
-
-impl XFileMetadata {
-    /// Construct the header from the given encrypted metadata.
-    pub fn from(bytes: &[u8]) -> Self {
-        XFileMetadata {
-            metadata: b64::encode(bytes),
-        }
-    }
-}
-
-/// Make this struct usable as reqwest header.
-impl Header for XFileMetadata {
-    fn header_name() -> &'static str {
-        "X-File-Metadata"
-    }
-
-    fn parse_header(_raw: &Raw) -> Result<Self, HyperError> {
-        // TODO: implement this some time
-        unimplemented!();
-    }
-
-    fn fmt_header(&self, f: &mut HeaderFormatter) -> fmt::Result {
-        // TODO: is this encoding base64 for us?
-        f.fmt_line(&self.metadata)
     }
 }

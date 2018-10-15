@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use reqwest::{Client, Response};
-use reqwest::header::{AUTHORIZATION, HeaderName};
+use reqwest::header::{AUTHORIZATION, CONTENT_LENGTH};
 
 use api::url::UrlBuilder;
 use api::request::{ensure_success, ResponseError};
@@ -168,9 +168,7 @@ impl<'a> Download<'a> {
 
         // Build and send the download request
         let response = client.get(UrlBuilder::api_download(self.file))
-            .header(AUTHORIZATION(
-                format!("send-v1 {}", sig)
-            ))
+            .header(AUTHORIZATION.as_str(), format!("send-v1 {}", sig))
             .send()
             .map_err(|_| DownloadError::Request)?;
 
@@ -180,8 +178,12 @@ impl<'a> Download<'a> {
 
         // Get the content length
         // TODO: make sure there is enough disk space
-        let len = response.headers().get::<HeaderName>()
-            .ok_or(DownloadError::NoLength)?.0;
+        let len = response.headers().get(CONTENT_LENGTH)
+            .ok_or(DownloadError::NoLength)?
+            .to_str()
+            .map_err(|_| DownloadError::NoLength)?
+            .parse()
+            .map_err(|_| DownloadError::NoLength)?;
 
         Ok((response, len))
     }
