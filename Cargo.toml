@@ -30,7 +30,7 @@ chrono = {version = "0.4", features = ["serde"]}
 derive_builder = "0.6"
 failure = "0.1"
 failure_derive = "0.1"
-hkdf = "0.6.1-alpha.0"
+hkdf = "0.7"
 hyper = "0.12.7" # same as reqwest
 mime = "0.3.10" # same as reqwest
 mime_guess = "2.0.0-alpha.4"
@@ -44,8 +44,3 @@ sha2 = "0.8"
 time = "0.1"
 url = "1.7"
 url_serde = "0.2"
-
-# Patch until an hkdf update is released
-[patch.crates-io.hkdf]
-git = "https://github.com/timvisee/KDFs.git"
-rev = "277cf5d"
