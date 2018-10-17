@@ -41,11 +41,8 @@ jobs:
         on:
           tags: true
           branch: master
-    - stage: release
-      script:
-        - echo $CARGO_TOKEN | cargo login
-        - cargo publish --verbose
-      cache: cargo
-
-# TODO: enfore the git tag/crate version equality for releases
-# TODO: disable addons/rust installation for GitHub release job
+    # - stage: release
+    #   script:
+    #     - echo $CARGO_TOKEN | cargo login
+    #     - cargo publish --verbose
+    #   cache: cargo
