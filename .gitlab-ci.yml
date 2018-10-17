@@ -2,9 +2,9 @@ image: "rust:slim"
 
 stages:
   - check
-  - build
   - test
   - release
+  - trigger
 
 variables:
   RUST_VERSION: stable
@@ -66,3 +66,12 @@ crate:
     - echo "Creating release crate on crates.io..."
     - echo $CARGO_TOKEN | cargo login
     - cargo publish --verbose
+
+# Trigger an ffsend CLI client build when an update is released
+trigger-ffsend:
+  stage: trigger
+  only:
+    - "/^v([0-9]+\\.)*[0-9]+.*$/"
+  script:
+    - apt-get install -y --no-install-recommends curl
+    - "curl -X POST -F token=$FFSEND_TOKEN -F ref=master https://gitlab.com/api/v4/projects/5664378/trigger/pipeline"
