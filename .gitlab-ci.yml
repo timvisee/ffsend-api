@@ -1,0 +1,68 @@
+image: "rust:slim"
+
+stages:
+  - check
+  - build
+  - test
+  - release
+
+variables:
+  RUST_VERSION: stable
+
+# Cargo artifacts caching per Rust version and pipeline
+cache:
+  key: "$RUST_VERSION"
+  paths:
+    - /usr/local/rustup/
+    - /usr/local/cargo/
+    - target/
+
+# Install compiler and OpenSSL dependencies
+before_script:
+  - apt-get update
+  - apt-get install -y --no-install-recommends build-essential pkg-config libssl-dev
+  - |
+    rustup install $RUST_VERSION
+    rustup default $RUST_VERSION
+  - |
+    rustc --version
+    cargo --version
+
+# Variable defaults
+variables:
+  RUST_VERSION: stable
+
+# Check on stable, beta and nightly 
+.check-base: &check-base
+  stage: check
+  script:
+    - cargo check --verbose
+rust-stable:
+  <<: *check-base
+rust-beta:
+  <<: *check-base
+  variables:
+    RUST_VERSION: beta
+  cache: {}
+rust-nightly:
+  <<: *check-base
+  variables:
+    RUST_VERSION: nightly
+  cache: {}
+
+# Run the unit tests through Cargo
+cargo-test:
+  stage: test
+  dependencies: []
+  script:
+    - cargo test --verbose
+
+# Cargo crate release
+crate:
+  stage: release
+  only:
+    - "/^v([0-9]+\\.)*[0-9]+.*$/"
+  script:
+    - echo "Creating release crate on crates.io..."
+    - echo $CARGO_TOKEN | cargo login
+    - cargo publish --verbose

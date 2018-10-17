@@ -20,7 +20,7 @@ This repository is still being worked on,
 and this documentation is not finished yet.
 
 Here is a demo of the API implementation as used in [ffsend][ffsend]:  
-[![ffsend-api implementation demo from ffsend][ffsend-usage-demo-svg]][ffsend-usage-demo-asciinema]
+[![ffsend-api implementation demo from ffsend][ffsend-usage-demo-svg]][ffsend-usage-demo-asciinema]  
 _Implementation demo from [ffsend][ffsend] not visible here?
 View it on [asciinema][ffsend-usage-demo-asciinema]._
 
