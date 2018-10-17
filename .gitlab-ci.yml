@@ -61,10 +61,11 @@ cargo-test:
 crate:
   stage: release
   only:
-    - "/^v([0-9]+\\.)*[0-9]+.*$/"
+    - /^v(\d+\.)*\d+.*$/
   script:
     - echo "Creating release crate on crates.io..."
     - echo $CARGO_TOKEN | cargo login
+    - echo "Publishing crate to crates.io..."
     - cargo publish --verbose
 
 # Trigger an ffsend CLI client build when an update is released
