@@ -27,7 +27,7 @@ path = "src/lib.rs"
 arrayref = "0.3"
 base64 = "0.9"
 chrono = {version = "0.4", features = ["serde"]}
-derive_builder = "0.6"
+derive_builder = "0.7"
 failure = "0.1"
 failure_derive = "0.1"
 hkdf = "0.7"
