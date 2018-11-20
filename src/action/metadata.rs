@@ -2,6 +2,14 @@ use failure::Error as FailureError;
 use openssl::symm::decrypt_aead;
 use reqwest::header::AUTHORIZATION;
 use reqwest::Client;
+use serde::{
+    Deserialize,
+    Deserializer,
+    de::{
+        Error as SerdeError,
+        Unexpected,
+    },
+};
 use serde_json;
 
 use super::exists::{Error as ExistsError, Exists as ExistsAction};
@@ -120,6 +128,7 @@ pub struct RawMetadataResponse {
     meta: String,
 
     /// The file size in bytes.
+    #[serde(deserialize_with = "deserialize_u64")]
     size: u64,
 }
 
@@ -155,6 +164,18 @@ impl RawMetadataResponse {
     pub fn size(&self) -> u64 {
         self.size
     }
+}
+
+/// A deserializer for u64 that uses `parse()`.
+/// This is used when deserializing raw metadata,
+/// as the file size u64 is formatted as a string.
+fn deserialize_u64<'d, D>(d: D) -> Result<u64, D::Error> where D: Deserializer<'d> {
+    Deserialize::deserialize(d)
+        .and_then(|x: String| {
+            x.parse().map_err(|_|
+                    SerdeError::invalid_type(Unexpected::Str(&x), &"a positive integer")
+            )
+        })
 }
 
 /// The decoded and decrypted metadata response, holding all the properties.
