@@ -6,7 +6,7 @@
 
 extern crate base64;
 
-pub use self::base64::{CharacterSet, Config, DecodeError, LineEnding, LineWrap};
+pub use self::base64::{CharacterSet, Config, DecodeError};
 
 /// Encode the given byte slice using base64,
 /// in an URL-safe manner without padding.
