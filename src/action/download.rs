@@ -3,7 +3,7 @@ use std::io::{self, Error as IoError, Read};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use reqwest::header::{AUTHORIZATION, CONTENT_LENGTH};
+use reqwest::header::AUTHORIZATION;
 use reqwest::{Client, Response};
 
 use super::metadata::{Error as MetadataError, Metadata as MetadataAction, MetadataResponse};
@@ -83,7 +83,7 @@ impl<'a> Download<'a> {
             .map_err(|err| Error::File(path_str.clone(), FileError::Create(err)))?;
 
         // Create the file reader for downloading
-        let (reader, len) = self.create_file_reader(&key, metadata.nonce(), &client)?;
+        let (reader, len) = self.create_file_reader(&key, &metadata, &client)?;
 
         // Create the file writer
         let writer = self
@@ -137,11 +137,11 @@ impl<'a> Download<'a> {
     fn create_file_reader(
         &self,
         key: &KeySet,
-        meta_nonce: &[u8],
+        metadata: &MetadataResponse,
         client: &Client,
     ) -> Result<(Response, u64), DownloadError> {
         // Compute the cryptographic signature
-        let sig = signature_encoded(key.auth_key().unwrap(), &meta_nonce)
+        let sig = signature_encoded(key.auth_key().unwrap(), metadata.nonce())
             .map_err(|_| DownloadError::ComputeSignature)?;
 
         // Build and send the download request
@@ -156,14 +156,7 @@ impl<'a> Download<'a> {
 
         // Get the content length
         // TODO: make sure there is enough disk space
-        let len = response
-            .headers()
-            .get(CONTENT_LENGTH)
-            .ok_or(DownloadError::NoLength)?
-            .to_str()
-            .map_err(|_| DownloadError::NoLength)?
-            .parse()
-            .map_err(|_| DownloadError::NoLength)?;
+        let len = metadata.size();
 
         Ok((response, len))
     }
@@ -293,11 +286,6 @@ pub enum DownloadError {
     /// The server responded with an error while requesting the file download.
     #[fail(display = "bad response from server while requesting download")]
     Response(#[cause] ResponseError),
-
-    /// The length of the file is missing, thus the length of the file to download
-    /// couldn't be determined.
-    #[fail(display = "couldn't determine file download length, missing property")]
-    NoLength,
 
     /// Failed to start or update the downloading progress, because of this the
     /// download can't continue.
