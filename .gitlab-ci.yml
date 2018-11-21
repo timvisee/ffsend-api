@@ -51,7 +51,7 @@ rust-nightly:
 rust-old:
   <<: *check-base
   variables:
-    RUST_VERSION: 1.26
+    RUST_VERSION: "1.26"
 
 # Run the unit tests through Cargo
 cargo-test:
