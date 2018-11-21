@@ -9,12 +9,13 @@ stages:
 variables:
   RUST_VERSION: stable
 
-# Cargo artifacts caching per Rust version and pipeline
+# Cache rust/cargo/build artifacts
 cache:
-  key: "$RUST_VERSION"
+  key: "$CI_PIPELINE_ID-$RUST_VERSION"
   paths:
-    - /usr/local/rustup/
-    - /usr/local/cargo/
+    - /usr/local/cargo/registry/
+    - /usr/local/rustup/toolchains/
+    - /usr/local/rustup/update-hashes/
     - target/
 
 # Install compiler and OpenSSL dependencies
@@ -43,12 +44,10 @@ rust-beta:
   <<: *check-base
   variables:
     RUST_VERSION: beta
-  cache: {}
 rust-nightly:
   <<: *check-base
   variables:
     RUST_VERSION: nightly
-  cache: {}
 
 # Run the unit tests through Cargo
 cargo-test:
