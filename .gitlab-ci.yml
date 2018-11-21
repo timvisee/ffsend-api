@@ -48,6 +48,10 @@ rust-nightly:
   <<: *check-base
   variables:
     RUST_VERSION: nightly
+rust-1_26:
+  <<: *check-base
+  variables:
+    RUST_VERSION: 1.26
 
 # Run the unit tests through Cargo
 cargo-test:
