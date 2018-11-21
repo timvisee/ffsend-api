@@ -48,7 +48,7 @@ rust-nightly:
   <<: *check-base
   variables:
     RUST_VERSION: nightly
-rust-1_26:
+rust-old:
   <<: *check-base
   variables:
     RUST_VERSION: 1.26
