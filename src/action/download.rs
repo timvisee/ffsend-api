@@ -57,7 +57,7 @@ impl<'a> Download<'a> {
     pub fn invoke(
         mut self,
         client: &Client,
-        reporter: &Arc<Mutex<ProgressReporter>>,
+        reporter: Option<&Arc<Mutex<ProgressReporter>>>,
     ) -> Result<(), Error> {
         // Create a key set for the file
         let mut key = KeySet::from(self.file, self.password.as_ref());
@@ -87,11 +87,11 @@ impl<'a> Download<'a> {
 
         // Create the file writer
         let writer = self
-            .create_file_writer(out, len, &key, &reporter)
+            .create_file_writer(out, len, &key, reporter)
             .map_err(|err| Error::File(path_str.clone(), err))?;
 
         // Download the file
-        self.download(reader, writer, len, &reporter)?;
+        self.download(reader, writer, len, reporter)?;
 
         // TODO: return the file path
         // TODO: return the new remote state (does it still exist remote)
@@ -170,7 +170,7 @@ impl<'a> Download<'a> {
         file: File,
         len: u64,
         key: &KeySet,
-        reporter: &Arc<Mutex<ProgressReporter>>,
+        reporter: Option<&Arc<Mutex<ProgressReporter>>>,
     ) -> Result<ProgressWriter<EncryptedFileWriter>, FileError> {
         // Build an encrypted writer
         let mut writer = ProgressWriter::new(
@@ -186,7 +186,9 @@ impl<'a> Download<'a> {
         .map_err(|_| FileError::EncryptedWriter)?;
 
         // Set the reporter
-        writer.set_reporter(reporter.clone());
+        if let Some(reporter) = reporter {
+            writer.set_reporter(reporter.clone());
+        }
 
         Ok(writer)
     }
@@ -199,22 +201,26 @@ impl<'a> Download<'a> {
         mut reader: R,
         mut writer: ProgressWriter<EncryptedFileWriter>,
         len: u64,
-        reporter: &Arc<Mutex<ProgressReporter>>,
+        reporter: Option<&Arc<Mutex<ProgressReporter>>>,
     ) -> Result<(), DownloadError> {
         // Start the writer
-        reporter
-            .lock()
-            .map_err(|_| DownloadError::Progress)?
-            .start(len);
+        if let Some(reporter) = reporter {
+            reporter
+                .lock()
+                .map_err(|_| DownloadError::Progress)?
+                .start(len);
+        }
 
         // Write to the output file
         io::copy(&mut reader, &mut writer).map_err(|_| DownloadError::Download)?;
 
         // Finish
-        reporter
-            .lock()
-            .map_err(|_| DownloadError::Progress)?
-            .finish();
+        if let Some(reporter) = reporter {
+            reporter
+                .lock()
+                .map_err(|_| DownloadError::Progress)?
+                .finish();
+        }
 
         // Verify the writer
         if writer.unwrap().verified() {

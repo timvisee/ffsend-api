@@ -67,7 +67,7 @@ impl Upload {
     pub fn invoke(
         self,
         client: &Client,
-        reporter: &Arc<Mutex<ProgressReporter>>,
+        reporter: Option<&Arc<Mutex<ProgressReporter>>>,
     ) -> Result<RemoteFile, Error> {
         // Create file data, generate a key
         let file = FileData::from(&self.path)?;
@@ -75,23 +75,27 @@ impl Upload {
 
         // Create metadata and a file reader
         let metadata = self.create_metadata(&key, &file)?;
-        let reader = self.create_reader(&key, reporter.clone())?;
+        let reader = self.create_reader(&key, reporter.cloned())?;
         let reader_len = reader.len().unwrap();
 
         // Create the request to send
         let req = self.create_request(client, &key, &metadata, reader);
 
         // Start the reporter
-        reporter
-            .lock()
-            .map_err(|_| UploadError::Progress)?
-            .start(reader_len);
+        if let Some(reporter) = reporter {
+            reporter
+                .lock()
+                .map_err(|_| UploadError::Progress)?
+                .start(reader_len);
+        }
 
         // Execute the request
         let (result, nonce) = self.execute_request(req, client, &key)?;
 
         // Mark the reporter as finished
-        reporter.lock().map_err(|_| UploadError::Progress)?.finish();
+        if let Some(reporter) = reporter {
+            reporter.lock().map_err(|_| UploadError::Progress)?.finish();
+        }
 
         // Change the password if set
         if let Some(password) = self.password {
@@ -140,7 +144,7 @@ impl Upload {
     fn create_reader(
         &self,
         key: &KeySet,
-        reporter: Arc<Mutex<ProgressReporter>>,
+        reporter: Option<Arc<Mutex<ProgressReporter>>>,
     ) -> Result<EncryptedReader, Error> {
         // Open the file
         let file = match File::open(self.path.as_path()) {
@@ -166,7 +170,9 @@ impl Upload {
         let mut reader = ProgressReader::new(reader).map_err(|_| ReaderError::Progress)?;
 
         // Initialize and attach the reporter
-        reader.set_reporter(reporter);
+        if let Some(reporter) = reporter {
+            reader.set_reporter(reporter);
+        }
 
         Ok(reader)
     }
