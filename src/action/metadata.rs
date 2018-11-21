@@ -3,17 +3,10 @@ use openssl::symm::decrypt_aead;
 use reqwest::header::AUTHORIZATION;
 use reqwest::Client;
 use serde::{
-    Deserialize,
-    Deserializer,
-    de::{
-        Error as SerdeError,
-        Unexpected,
-    },
+    de::{Error as SerdeError, Unexpected},
+    Deserialize, Deserializer,
 };
-use serde_json::{
-    self,
-    Value as JsonValue,
-};
+use serde_json::{self, Value as JsonValue};
 
 use super::exists::{Error as ExistsError, Exists as ExistsAction};
 use api::nonce::{header_nonce, request_nonce, NonceError};
@@ -172,27 +165,28 @@ impl RawMetadataResponse {
 /// A more forgiving deserializer for u64 values than the strict default.
 /// This is used when deserializing raw metadata,
 /// as the file size u64 is formatted as a string.
-fn deserialize_u64<'d, D>(d: D) -> Result<u64, D::Error> where D: Deserializer<'d> {
-    Deserialize::deserialize(d)
-        .and_then(|value: JsonValue| {
-            match value {
-                JsonValue::Number(n) =>
-                    n.as_u64().ok_or_else(||
-                        if let Some(n) = n.as_i64() {
-                            SerdeError::invalid_type(Unexpected::Signed(n), &"a positive integer")
-                        } else if let Some(n) = n.as_f64() {
-                            SerdeError::invalid_type(Unexpected::Float(n), &"a positive integer")
-                        } else {
-                            SerdeError::invalid_type(Unexpected::Str(&n.to_string()), &"a positive integer")
-                        }
-                    ),
-                JsonValue::String(s) =>
-                    s.parse().map_err(|_|
-                        SerdeError::invalid_type(Unexpected::Str(&s), &"a positive integer")
-                    ),
-                o => Err(SerdeError::invalid_type(Unexpected::Other(&o.to_string()), &"a positive integer")),
+fn deserialize_u64<'d, D>(d: D) -> Result<u64, D::Error>
+where
+    D: Deserializer<'d>,
+{
+    Deserialize::deserialize(d).and_then(|value: JsonValue| match value {
+        JsonValue::Number(n) => n.as_u64().ok_or_else(|| {
+            if let Some(n) = n.as_i64() {
+                SerdeError::invalid_type(Unexpected::Signed(n), &"a positive integer")
+            } else if let Some(n) = n.as_f64() {
+                SerdeError::invalid_type(Unexpected::Float(n), &"a positive integer")
+            } else {
+                SerdeError::invalid_type(Unexpected::Str(&n.to_string()), &"a positive integer")
             }
-        })
+        }),
+        JsonValue::String(s) => s
+            .parse()
+            .map_err(|_| SerdeError::invalid_type(Unexpected::Str(&s), &"a positive integer")),
+        o => Err(SerdeError::invalid_type(
+            Unexpected::Other(&o.to_string()),
+            &"a positive integer",
+        )),
+    })
 }
 
 /// The decoded and decrypted metadata response, holding all the properties.
