@@ -22,7 +22,7 @@ pub fn decode(input: &str) -> Result<Vec<u8>, DecodeError> {
         input
             .replace('+', "-")
             .replace('/', "_")
-            .trim_right_matches('='),
+            .trim_end_matches('='),
         base64::URL_SAFE_NO_PAD,
     )
 }
