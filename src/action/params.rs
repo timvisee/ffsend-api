@@ -1,10 +1,10 @@
 use reqwest::Client;
 
-use api::data::{Error as DataError, OwnedData};
-use api::nonce::{request_nonce, NonceError};
-use api::request::{ensure_success, ResponseError};
-use api::url::UrlBuilder;
-use file::remote_file::RemoteFile;
+use crate::api::data::{Error as DataError, OwnedData};
+use crate::api::nonce::{request_nonce, NonceError};
+use crate::api::request::{ensure_success, ResponseError};
+use crate::api::url::UrlBuilder;
+use crate::file::remote_file::RemoteFile;
 
 /// The default download count.
 pub const PARAMS_DEFAULT_DOWNLOAD: u8 = 1;

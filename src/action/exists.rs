@@ -1,8 +1,8 @@
 use reqwest::Client;
 
-use api::request::{ensure_success, ResponseError};
-use api::url::UrlBuilder;
-use file::remote_file::RemoteFile;
+use crate::api::request::{ensure_success, ResponseError};
+use crate::api::url::UrlBuilder;
+use crate::file::remote_file::RemoteFile;
 
 /// An action to check whether a remote file exists.
 /// This aciton returns an `ExistsResponse`, that defines whether the file

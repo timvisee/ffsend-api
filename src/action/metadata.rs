@@ -9,14 +9,14 @@ use serde::{
 use serde_json::{self, Value as JsonValue};
 
 use super::exists::{Error as ExistsError, Exists as ExistsAction};
-use api::nonce::{header_nonce, request_nonce, NonceError};
-use api::request::{ensure_success, ResponseError};
-use api::url::UrlBuilder;
-use crypto::b64;
-use crypto::key_set::KeySet;
-use crypto::sig::signature_encoded;
-use file::metadata::Metadata as MetadataData;
-use file::remote_file::RemoteFile;
+use crate::api::nonce::{header_nonce, request_nonce, NonceError};
+use crate::api::request::{ensure_success, ResponseError};
+use crate::api::url::UrlBuilder;
+use crate::crypto::b64;
+use crate::crypto::key_set::KeySet;
+use crate::crypto::sig::signature_encoded;
+use crate::file::metadata::Metadata as MetadataData;
+use crate::file::remote_file::RemoteFile;
 
 /// An action to fetch file metadata.
 pub struct Metadata<'a> {

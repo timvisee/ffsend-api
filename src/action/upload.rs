@@ -6,7 +6,6 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use self::mime::APPLICATION_OCTET_STREAM;
-use crypto::b64;
 use mime_guess::{guess_mime_type, Mime};
 use openssl::symm::encrypt_aead;
 use reqwest::header::AUTHORIZATION;
@@ -16,12 +15,13 @@ use url::{ParseError as UrlParseError, Url};
 
 use super::params::{Error as ParamsError, Params, ParamsData};
 use super::password::{Error as PasswordError, Password};
-use api::nonce::header_nonce;
-use api::request::{ensure_success, ResponseError};
-use crypto::key_set::KeySet;
-use file::metadata::Metadata;
-use file::remote_file::RemoteFile;
-use reader::{EncryptedFileReader, ExactLengthReader, ProgressReader, ProgressReporter};
+use crate::api::nonce::header_nonce;
+use crate::api::request::{ensure_success, ResponseError};
+use crate::crypto::b64;
+use crate::crypto::key_set::KeySet;
+use crate::file::metadata::Metadata;
+use crate::file::remote_file::RemoteFile;
+use crate::reader::{EncryptedFileReader, ExactLengthReader, ProgressReader, ProgressReporter};
 
 type EncryptedReader = ProgressReader<BufReader<EncryptedFileReader>>;
 

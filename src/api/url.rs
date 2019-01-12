@@ -1,6 +1,6 @@
 use url::Url;
 
-use file::remote_file::RemoteFile;
+use crate::file::remote_file::RemoteFile;
 
 /// A struct, that helps building URLs for communicating with a remote host.
 pub struct UrlBuilder;

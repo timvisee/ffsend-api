@@ -1,6 +1,6 @@
 use serde::Serialize;
 
-use file::remote_file::RemoteFile;
+use crate::file::remote_file::RemoteFile;
 
 /// An owned data structure, that wraps generic data.
 /// This structure is used to send owned data to the Send server.

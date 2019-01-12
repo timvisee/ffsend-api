@@ -3,8 +3,8 @@ use url::Url;
 
 use super::hdkf::{derive_auth_key, derive_file_key, derive_meta_key};
 use super::{b64, rand_bytes};
-use api::url::UrlBuilder;
-use file::remote_file::RemoteFile;
+use crate::api::url::UrlBuilder;
+use crate::file::remote_file::RemoteFile;
 
 /// The length of an input vector.
 const KEY_IV_LEN: usize = 12;

@@ -2,11 +2,11 @@ use std::cmp::max;
 
 use reqwest::{Client, Error as ReqwestError};
 
-use api::data::{Error as DataError, OwnedData};
-use api::nonce::{request_nonce, NonceError};
-use api::request::{ensure_success, ResponseError};
-use api::url::UrlBuilder;
-use file::remote_file::RemoteFile;
+use crate::api::data::{Error as DataError, OwnedData};
+use crate::api::nonce::{request_nonce, NonceError};
+use crate::api::request::{ensure_success, ResponseError};
+use crate::api::url::UrlBuilder;
+use crate::file::remote_file::RemoteFile;
 
 /// An action to fetch info of a shared file.
 pub struct Info<'a> {

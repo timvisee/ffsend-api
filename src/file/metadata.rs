@@ -3,7 +3,7 @@ extern crate hyper;
 use mime_guess::Mime;
 use serde_json;
 
-use crypto::b64;
+use crate::crypto::b64;
 
 /// The MIME type string for a tar file.
 const MIME_TAR: &str = "application/x-tar";

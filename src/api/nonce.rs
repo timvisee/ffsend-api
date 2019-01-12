@@ -1,9 +1,9 @@
 use reqwest::{Client, Response};
+use reqwest::header::{HeaderName, WWW_AUTHENTICATE};
 use url::Url;
 
-use api::request::{ensure_success, ResponseError};
-use crypto::b64;
-use reqwest::header::{HeaderName, WWW_AUTHENTICATE};
+use crate::api::request::{ensure_success, ResponseError};
+use crate::crypto::b64;
 
 /// The name of the header the nonce is delivered in.
 const HEADER_NONCE: HeaderName = WWW_AUTHENTICATE;

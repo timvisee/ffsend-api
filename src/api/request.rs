@@ -1,7 +1,7 @@
 use reqwest::{Response, StatusCode};
 
-use config::{HTTP_STATUS_EXPIRED, HTTP_STATUS_UNAUTHORIZED};
-use ext::status_code::StatusCodeExt;
+use crate::config::{HTTP_STATUS_EXPIRED, HTTP_STATUS_UNAUTHORIZED};
+use crate::ext::status_code::StatusCodeExt;
 
 /// Ensure the given response is successful. IF it isn
 pub fn ensure_success(response: &Response) -> Result<(), ResponseError> {

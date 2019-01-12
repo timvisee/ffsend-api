@@ -1,11 +1,11 @@
 use reqwest::Client;
 
-use api::data::{Error as DataError, OwnedData};
-use api::nonce::{request_nonce, NonceError};
-use api::request::{ensure_success, ResponseError};
-use api::url::UrlBuilder;
-use crypto::key_set::KeySet;
-use file::remote_file::RemoteFile;
+use crate::api::data::{Error as DataError, OwnedData};
+use crate::api::nonce::{request_nonce, NonceError};
+use crate::api::request::{ensure_success, ResponseError};
+use crate::api::url::UrlBuilder;
+use crate::crypto::key_set::KeySet;
+use crate::file::remote_file::RemoteFile;
 
 /// An action to change a password of an uploaded Send file.
 pub struct Password<'a> {

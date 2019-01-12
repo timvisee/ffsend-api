@@ -15,6 +15,7 @@ categories = [
     "cryptography",
     "network-programming",
 ]
+edition = "2018"
 
 [badges]
 travis-ci = { repository = "timvisee/ffsend-api", branch = "master" }

@@ -7,12 +7,12 @@ use reqwest::header::AUTHORIZATION;
 use reqwest::{Client, Response};
 
 use super::metadata::{Error as MetadataError, Metadata as MetadataAction, MetadataResponse};
-use api::request::{ensure_success, ResponseError};
-use api::url::UrlBuilder;
-use crypto::key_set::KeySet;
-use crypto::sig::signature_encoded;
-use file::remote_file::RemoteFile;
-use reader::{EncryptedFileWriter, ProgressReporter, ProgressWriter};
+use crate::api::request::{ensure_success, ResponseError};
+use crate::api::url::UrlBuilder;
+use crate::crypto::key_set::KeySet;
+use crate::crypto::sig::signature_encoded;
+use crate::file::remote_file::RemoteFile;
+use crate::reader::{EncryptedFileWriter, ProgressReporter, ProgressWriter};
 
 /// A file upload action to a Send server.
 pub struct Download<'a> {
