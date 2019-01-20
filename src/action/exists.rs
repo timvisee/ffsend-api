@@ -56,16 +56,16 @@ pub struct ExistsResponse {
     exists: bool,
 
     /// Whether this file requires a password.
-    #[serde(rename = "password")]
-    has_password: bool,
+    #[serde(rename = "password", alias = "requiresPassword")]
+    requires_password: bool,
 }
 
 impl ExistsResponse {
     /// Construct a new response.
-    pub fn new(exists: bool, has_password: bool) -> Self {
+    pub fn new(exists: bool, requires_password: bool) -> Self {
         ExistsResponse {
             exists,
-            has_password,
+            requires_password,
         }
     }
 
@@ -80,8 +80,14 @@ impl ExistsResponse {
     }
 
     /// Whether the remote file is protected by a password.
+    #[deprecated(since = "0.2", note="please use `requires_password` instead")]
     pub fn has_password(&self) -> bool {
-        self.has_password
+        self.requires_password()
+    }
+
+    /// Whether the remote file is protected by a password.
+    pub fn requires_password(&self) -> bool {
+        self.requires_password
     }
 }
 
@@ -89,7 +95,7 @@ impl Default for ExistsResponse {
     fn default() -> Self {
         ExistsResponse {
             exists: false,
-            has_password: false,
+            requires_password: false,
         }
     }
 }
