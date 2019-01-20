@@ -52,7 +52,7 @@ impl<'a> Metadata<'a> {
             }
 
             // Make sure a password is given when it is required
-            if self.password.is_none() && exist_response.has_password() {
+            if self.password.is_none() && exist_response.requires_password() {
                 return Err(Error::PasswordRequired);
             }
         }
