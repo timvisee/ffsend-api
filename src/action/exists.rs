@@ -56,7 +56,8 @@ pub struct ExistsResponse {
     exists: bool,
 
     /// Whether this file requires a password.
-    #[serde(rename = "password", alias = "requiresPassword")]
+    // This field is named `password` in Send v1
+    #[serde(rename = "requiresPassword", alias = "password")]
     requires_password: bool,
 }
 

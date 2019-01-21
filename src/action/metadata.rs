@@ -117,15 +117,31 @@ impl<'a> Metadata<'a> {
 /// The metadata response from the server, when fetching the data through
 /// the API.
 /// This response contains raw metadata, which is still encrypted.
+// TODO: rename this into EncryptedMetadataResponse?
+// TODO: don't use enum, make size field optional
 #[derive(Debug, Deserialize)]
-pub struct RawMetadataResponse {
-    /// The encrypted metadata.
-    #[serde(rename = "metadata")]
-    meta: String,
+#[serde(untagged)]
+pub enum RawMetadataResponse {
+    /// Raw metadata using in Send v1.
+    V1 {
+        /// The encrypted metadata.
+        #[serde(rename = "metadata")]
+        meta: String,
 
-    /// The file size in bytes.
-    #[serde(deserialize_with = "deserialize_u64")]
-    size: u64,
+        /// The file size in bytes.
+        #[serde(deserialize_with = "deserialize_u64")]
+        size: u64,
+    },
+
+    /// Raw metadata using in Send v2.
+    V2 {
+        /// The encrypted metadata.
+        #[serde(rename = "metadata")]
+        meta: String,
+    },
+
+    // TODO: Use `finalDownload` field?
+    // TODO: Use `ttl` field?
 }
 
 impl RawMetadataResponse {
@@ -135,7 +151,7 @@ impl RawMetadataResponse {
     /// If verification failed, an error is returned.
     pub fn decrypt_metadata(&self, key_set: &KeySet) -> Result<MetadataData, FailureError> {
         // Decode the metadata
-        let raw = b64::decode(&self.meta)?;
+        let raw = b64::decode(self.meta())?;
 
         // Get the encrypted metadata, and it's tag
         let (encrypted, tag) = raw.split_at(raw.len() - 16);
@@ -152,13 +168,31 @@ impl RawMetadataResponse {
             &tag,
         )?;
 
+        // TODO: remove after debugging
+        eprintln!("DECRYPTED RAW METADATA: {:?}", String::from_utf8_lossy(&meta));
+
         // Parse the metadata, and return
         Ok(serde_json::from_slice(&meta)?)
     }
 
-    /// Get the file size in bytes.
-    pub fn size(&self) -> u64 {
-        self.size
+    /// Get the encrypted metadata.
+    fn meta(&self) -> &str {
+        match self {
+            RawMetadataResponse::V1 { meta, size: _ } => &meta,
+            RawMetadataResponse::V2 { meta } => &meta,
+        }
+    }
+
+    /// Get the file size in bytes, if provided by the server (`= send v1`).
+    // TODO: use proper size
+    // pub fn size(&self) -> Option<u64> {
+    //     self.size
+    // }
+    pub fn size(&self) -> Option<u64> {
+        match self {
+            RawMetadataResponse::V1 { meta: _, size } => Some(*size),
+            RawMetadataResponse::V2 { meta: _ } => None,
+        }
     }
 }
 
@@ -195,8 +229,8 @@ pub struct MetadataResponse {
     /// The actual metadata.
     metadata: MetadataData,
 
-    /// The file size in bytes.
-    size: u64,
+    /// The file size in bytes, if provided by the server (`< send v2`).
+    size: Option<u64>,
 
     /// The metadata nonce.
     nonce: Vec<u8>,
@@ -204,7 +238,7 @@ pub struct MetadataResponse {
 
 impl<'a> MetadataResponse {
     /// Construct a new response with the given metadata and nonce.
-    pub fn new(metadata: MetadataData, size: u64, nonce: Vec<u8>) -> Self {
+    pub fn new(metadata: MetadataData, size: Option<u64>, nonce: Vec<u8>) -> Self {
         MetadataResponse {
             metadata,
             size,
@@ -232,7 +266,8 @@ impl<'a> MetadataResponse {
 
     /// Get the file size in bytes.
     pub fn size(&self) -> u64 {
-        self.size
+        // TODO: return proper error if not set, should never happen with current API
+        self.size.unwrap_or_else(|| self.metadata.size().expect("file size unknown, newer API?"))
     }
 
     /// Get the nonce.
