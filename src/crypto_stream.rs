@@ -109,13 +109,14 @@ impl<R> Read for EceReader<R>
             // Copy as much as possible from inner to output buffer, increase total
             let write = cmp::min(self.buf_out.len(), buf.len());
             total += write;
-            buf.copy_from_slice(&self.buf_out.split_to(write));
+            let (fill, left) = buf.split_at_mut(write);
+            fill.copy_from_slice(&self.buf_out.split_to(write));
 
             // Return if given buffer is full, or slice to unwritten buffer
             if total >= buf.len() {
                 return Ok(total);
             }
-            buf = &mut buf[write..];
+            buf = left;
         }
 
         // Attempt to fill input buffer if has capacity
@@ -141,7 +142,8 @@ impl<R> Read for EceReader<R>
             // Copy as much data as possible from crypter output to read buffer
             let write = cmp::min(out.len(), buf.len());
             total += write;
-            buf.copy_from_slice(&out[..write]);
+            let (fill, left) = buf.split_at_mut(write);
+            fill.copy_from_slice(&out[..write]);
 
             // Copy remaining bytes into output buffer
             if write < out.len() {
@@ -152,7 +154,7 @@ impl<R> Read for EceReader<R>
             if write >= buf.len() {
                 return Ok(total);
             }
-            buf = &mut buf[write..];
+            buf = left;
         }
 
         // Try again with remaining given buffer
