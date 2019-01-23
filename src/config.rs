@@ -17,3 +17,6 @@ pub const UPLOAD_SIZE_MAX_RECOMMENDED: u64 = 1024 * 1024 * 1024;
 
 /// The maximum upload size in bytes.
 pub const UPLOAD_SIZE_MAX: u64 = 1024 * 1024 * 1024 * 2;
+
+/// The ECE record size that is used (`>= Send v2`).
+pub const ECE_RECORD_SIZE: usize = 1024 * 64;

@@ -1,7 +1,9 @@
 #[macro_use]
 extern crate arrayref;
+extern crate bytes;
 #[macro_use]
 extern crate derive_builder;
+extern crate ece;
 extern crate failure;
 #[macro_use]
 extern crate failure_derive;
@@ -20,6 +22,7 @@ pub mod action;
 mod api;
 pub mod config;
 pub mod crypto;
+mod crypto_stream;
 mod ext;
 pub mod file;
 pub mod reader;
