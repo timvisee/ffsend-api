@@ -17,23 +17,20 @@ pub enum CryptMode {
 }
 
 /// Something that can encrypt or decrypt given data.
-pub trait Crypt<R, W>: Sized
-    where R: Read,
-          W: Write,
-{
+pub trait Crypt: Sized {
     /// The wrapping reader type used for this cryptographic type.
-    type Reader: CryptRead<Self, R, W>;
+    type Reader: CryptRead<Self>;
 
     /// The wrapping writer type used for this cryptographic type.
-    type Writer: CryptWrite<Self, R, W>;
+    type Writer: CryptWrite<Self>;
 
     /// Wrap the `inner` reader, bytes that are read are transformed with this cryptographic configuration.
-    fn reader(self, inner: R) -> Self::Reader {
+    fn reader(self, inner: Box<dyn Read>) -> Self::Reader {
         Self::Reader::new(self, inner)
     }
 
     /// Wrap the `inner` writer, bytes that are read are transformed with this cryptographic configuration.
-    fn writer(self, inner: W) -> Self::Writer {
+    fn writer(self, inner: Box<dyn Write>) -> Self::Writer {
         Self::Writer::new(self, inner)
     }
 
@@ -46,47 +43,36 @@ pub trait Crypt<R, W>: Sized
 }
 
 /// A reader wrapping another reader, to encrypt or decrypt data read from it.
-pub trait CryptRead<C, R, W>: Read
-    where C: Crypt<R, W>,
-          R: Read,
-          W: Write,
+pub trait CryptRead<C>: Read
+    where C: Crypt,
 {
     /// Wrap the given `inner` reader, transform data using `crypt`.
-    fn new(crypt: C, inner: R) -> Self;
+    fn new(crypt: C, inner: Box<dyn Read>) -> Self;
 }
 
 /// A writer wrapping another writher, to encrypt or decrypt data it is writen to.
-pub trait CryptWrite<C, R, W>: Write
-    where C: Crypt<R, W>,
-          R: Read,
-          W: Write,
+pub trait CryptWrite<C>: Write
+    where C: Crypt,
 {
     /// Wrap the given `inner` writer, transform data using `crypt`.
-    fn new(crypt: C, inner: W) -> Self;
+    fn new(crypt: C, inner: Box<dyn Write>) -> Self;
 }
 
-pub struct EceReader<R>
-    where R: Read,
-{
+pub struct EceReader {
     crypt: EceCrypt,
-    inner: R,
+    inner: Box<dyn Read>,
     buf_in: BytesMut,
     buf_out: BytesMut,
 }
 
-pub struct EceWriter<W>
-    where W: Write,
-{
+pub struct EceWriter {
     crypt: EceCrypt,
-    inner: W,
+    inner: Box<dyn Write>,
     buf: BytesMut,
 }
 
-impl<R, W> CryptRead<EceCrypt, R, W> for EceReader<R>
-    where R: Read,
-          W: Write,
-{
-    fn new(crypt: EceCrypt, inner: R) -> Self {
+impl CryptRead<EceCrypt> for EceReader {
+    fn new(crypt: EceCrypt, inner: Box<dyn Read>) -> Self {
         Self {
             crypt,
             inner,
@@ -97,9 +83,7 @@ impl<R, W> CryptRead<EceCrypt, R, W> for EceReader<R>
     }
 }
 
-impl<R> Read for EceReader<R>
-    where R: Read,
-{
+impl Read for EceReader {
     fn read(&mut self, mut buf: &mut [u8]) -> io::Result<usize> {
         // Number of bytes written to given buffer
         let mut total = 0;
@@ -109,14 +93,13 @@ impl<R> Read for EceReader<R>
             // Copy as much as possible from inner to output buffer, increase total
             let write = cmp::min(self.buf_out.len(), buf.len());
             total += write;
-            let (fill, left) = buf.split_at_mut(write);
-            fill.copy_from_slice(&self.buf_out.split_to(write));
+            buf[..write].copy_from_slice(&self.buf_out.split_to(write));
 
             // Return if given buffer is full, or slice to unwritten buffer
             if total >= buf.len() {
                 return Ok(total);
             }
-            buf = left;
+            buf = &mut buf[write..];
         }
 
         // Attempt to fill input buffer if has capacity
@@ -142,8 +125,7 @@ impl<R> Read for EceReader<R>
             // Copy as much data as possible from crypter output to read buffer
             let write = cmp::min(out.len(), buf.len());
             total += write;
-            let (fill, left) = buf.split_at_mut(write);
-            fill.copy_from_slice(&out[..write]);
+            buf[..write].copy_from_slice(&out[..write]);
 
             // Copy remaining bytes into output buffer
             if write < out.len() {
@@ -154,7 +136,7 @@ impl<R> Read for EceReader<R>
             if write >= buf.len() {
                 return Ok(total);
             }
-            buf = left;
+            buf = &mut buf[write..];
         }
 
         // Try again with remaining given buffer
@@ -162,11 +144,8 @@ impl<R> Read for EceReader<R>
     }
 }
 
-impl<R, W> CryptWrite<EceCrypt, R, W> for EceWriter<W>
-    where R: Read,
-          W: Write,
-{
-    fn new(crypt: EceCrypt, inner: W) -> Self {
+impl CryptWrite<EceCrypt> for EceWriter {
+    fn new(crypt: EceCrypt, inner: Box<dyn Write>) -> Self {
         Self {
             crypt,
             inner,
@@ -176,9 +155,7 @@ impl<R, W> CryptWrite<EceCrypt, R, W> for EceWriter<W>
     }
 }
 
-impl<W> Write for EceWriter<W>
-    where W: Write,
-{
+impl Write for EceWriter {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         // TODO: implement reader
         panic!("not yet implemented");
@@ -210,12 +187,9 @@ impl EceCrypt {
     }
 }
 
-impl<R, W> Crypt<R, W> for EceCrypt
-    where R: Read,
-          W: Write,
-{
-    type Reader = EceReader<R>;
-    type Writer = EceWriter<W>;
+impl Crypt for EceCrypt {
+    type Reader = EceReader;
+    type Writer = EceWriter;
 
     fn crypt(&mut self, input: &[u8]) -> (usize, Option<Vec<u8>>) {
         // How much to read, based on capacity that is left and given bytes
