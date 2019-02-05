@@ -71,10 +71,8 @@ pub trait CryptWrite<C>: Write
 
 /// Some thing that can encrypt or decrypt given data using crypto used AES GCM.
 pub struct GcmCrypt {
+    /// The crypto mode, make this encrypt or decrypt data.
     mode: CryptMode,
-
-    // TODO: remove this buffer, obsolete?
-    buf: BytesMut,
 
     /// The cipher type used for encryping or decrypting.
     cipher: OpenSslCipher,
@@ -113,7 +111,6 @@ impl GcmCrypt {
 
         Self {
             mode,
-            buf: BytesMut::new(),
             cipher,
             crypter,
             cur: 0,
@@ -148,6 +145,17 @@ impl GcmCrypt {
         self.tag.len() >= TAG_LEN
     }
 
+    /// Encrypt the given `input` data using this configured crypter.
+    ///
+    /// This function returns `(read, out)` where `read` represents the number of read bytes from
+    /// `input`, and `out` is a vector of now encrypted bytes.
+    ///
+    /// # Panics
+    ///
+    /// Panics if attempted to write more bytes than the length specified while configuring the
+    /// crypter.
+    ///
+    /// TODO: find a better name
     fn enc(&mut self, input: &[u8]) -> (usize, Option<Vec<u8>>) {
         // Don't allow encrypting more than specified, when tag is obtained
         if self.has_tag() && !input.is_empty() {
@@ -177,6 +185,17 @@ impl GcmCrypt {
         (len, Some(out))
     }
 
+    /// Decrypt the given `input` payload using this configured crypter.
+    ///
+    /// This function returns `(read, out)` where `read` represents the number of read bytes from
+    /// `input`, and `out` is a vector of now encrypted bytes.
+    ///
+    /// # Panics
+    ///
+    /// Panics if attempted to write more bytes than the length specified while configuring the
+    /// crypter.
+    ///
+    /// TODO: find a better name
     fn dec(&mut self, input: &[u8]) -> (usize, Option<Vec<u8>>) {
         // Don't allow decrypting more than specified, when tag is obtained
         if self.has_tag() && !input.is_empty() {
@@ -247,12 +266,6 @@ impl Crypt for GcmCrypt {
     type Writer = GcmWriter;
 
     fn crypt(&mut self, input: &[u8]) -> (usize, Option<Vec<u8>>) {
-        // How much to read, based on capacity that is left and given bytes
-        let size = cmp::min(self.buf.capacity() - self.buf.len(), input.len());
-
-        // Read bytes into the buffer
-        self.buf.put(&input[0..size]);
-
         match self.mode {
             CryptMode::Encrypt => self.enc(input),
             CryptMode::Decrypt => self.dec(input),
