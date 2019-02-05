@@ -1,6 +1,9 @@
 // TODO: remove this when publishing
 #![allow(unused)]
 
+// TODO: add verified flag/check to cryptor
+// TODO: add proper error reporting to cryptor
+
 use std::cmp::{self, max, min};
 use std::io::{self, BufRead, BufReader, Cursor, Error as IoError, Read, Write};
 
@@ -88,6 +91,9 @@ pub struct GcmCrypt {
     /// Data tag, used for verification.
     /// This is generated during encryption, and consumed during decryption.
     tag: Vec<u8>,
+
+    // TODO: add `verified` flag to keep track if decrypted is verified?
+    // verified: bool,
 }
 
 impl GcmCrypt {
@@ -137,25 +143,44 @@ impl GcmCrypt {
     }
 
     /// Check whether we have the whole tag.
-    /// When encrypting, this means the whole file has been encrypted and the tag was obtained.
+    /// When decrypting, this means all data has been processed and the suffixed tag was obtained.
     pub fn has_tag(&self) -> bool {
         self.tag.len() >= TAG_LEN
     }
 
     fn enc(&mut self, input: &[u8]) -> (usize, Option<Vec<u8>>) {
-        // TODO: also for encryption?
-        // // Don't allow encryping more than specified, when tag is obtained
-        // if self.has_tag() && !input.is_empty() {
-        //     panic!("could not write to AES-GCM crypter, all data already encrypted");
-        // }
+        // Don't allow encrypting more than specified, when tag is obtained
+        if self.has_tag() && !input.is_empty() {
+            panic!("could not write to AES-GCM crypter, exceeding specified length");
+        }
 
-        panic!("not yet implemented");
+        // Find input length and block size, increase current bytes counter
+        let len = input.len();
+        let block_size = self.cipher.block_size();
+        self.cur += len;
+
+        // Transform input data through crypter, collect output
+        // TODO: do not unwrap here, but try error
+        let mut out = vec![0u8; len + block_size];
+        let out_len = self.crypter.update(&input, &mut out).unwrap();
+        out.truncate(out_len);
+
+        // Finalize the crypter when all data is encrypted, append finalized to output
+        // TODO: do not unwrap in here, but try error
+        if self.cur >= self.len && !self.has_tag() {
+            let mut out_final = vec![0u8; block_size];
+            let final_len = self.crypter.finalize(&mut out_final).unwrap();
+            out.extend_from_slice(&out_final[..final_len]);
+            self.crypter.get_tag(&mut self.tag).unwrap();
+        }
+
+        (len, Some(out))
     }
 
     fn dec(&mut self, input: &[u8]) -> (usize, Option<Vec<u8>>) {
-        // Don't allow encryping more than specified, when tag is obtained
+        // Don't allow decrypting more than specified, when tag is obtained
         if self.has_tag() && !input.is_empty() {
-            panic!("could not write to AES-GCM crypter, all data already encrypted");
+            panic!("could not write to AES-GCM crypter, exceeding specified lenght");
         }
 
         // How many data and tag bytes we need to read, read chunks from input
@@ -204,11 +229,16 @@ impl GcmCrypt {
             // self.verified = true;
         }
 
-        // Update written bytes counter
+        // Update consumed input bytes counter
         let len = data_buf.len() + min(tag_buf.len(), TAG_LEN);
         self.cur += len;
 
-        (len, Some(out))
+        let out = if !out.is_empty() {
+            Some(out)
+        } else {
+            None
+        };
+        (len, out)
     }
 }
 
