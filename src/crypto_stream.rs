@@ -19,12 +19,22 @@ use openssl::symm::{
 const TAG_LEN: usize = 16;
 
 /// The cryptographic mode for a crypter: encrypt or decrypt.
+#[derive(Debug, Clone, Copy)]
 pub enum CryptMode {
     /// Encrypt data while transforming.
     Encrypt,
 
     /// Decrypt data while transforming.
     Decrypt,
+}
+
+impl Into<OpenSslMode> for CryptMode {
+    fn into(self) -> OpenSslMode {
+        match self {
+            CryptMode::Encrypt => OpenSslMode::Encrypt,
+            CryptMode::Decrypt => OpenSslMode::Decrypt,
+        }
+    }
 }
 
 /// Something that can encrypt or decrypt given data.
@@ -102,11 +112,7 @@ impl GcmCrypt {
         // Select the cipher and crypter to use
         // TODO: do not unwrap here
         let cipher = OpenSslCipher::aes_128_gcm();
-        let openssl_mode = match mode {
-            CryptMode::Encrypt => OpenSslMode::Encrypt,
-            CryptMode::Decrypt => OpenSslMode::Decrypt,
-        };
-        let crypter = OpenSslCrypter::new(cipher, openssl_mode, key, Some(iv))
+        let crypter = OpenSslCrypter::new(cipher, mode.into(), key, Some(iv))
             .expect("failed to create AES-GCM crypter");
 
         Self {
