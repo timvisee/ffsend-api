@@ -209,9 +209,11 @@ impl GcmCrypt {
         }
 
         // How many data and tag bytes we need to read, read chunks from input
-        let data_bytes = max(self.len - self.cur, 0);
-        let tag_bytes = TAG_LEN - self.tag.len();
-        let (data_buf, tag_buf) = input.split_at(min(data_bytes, input.len()));
+        let data_len = max(self.len - self.cur, 0);
+        let tag_len = TAG_LEN - self.tag.len();
+        let consumed = min(data_len + tag_len, input.len());
+        let (data_buf, tag_buf) = input.split_at(min(data_len, input.len()));
+        self.cur += consumed;
 
         let mut out = Vec::new();
 
@@ -219,11 +221,12 @@ impl GcmCrypt {
         if !data_buf.is_empty() {
             // Create a decrypted buffer, with the proper size
             let block_size = self.cipher.block_size();
-            let mut decrypted = vec![0u8; data_bytes + block_size];
+            let mut decrypted = vec![0u8; data_len + block_size];
 
             // Decrypt bytes
             // TODO: do not unwrap, but try error
-            let len = self.crypter.update(data_buf, &mut decrypted).unwrap();
+            let len = self.crypter.update(data_buf, &mut decrypted)
+                .expect("failed to update AES-GCM crypter with new data");
 
             // Add decrypted bytes to output
             out.extend_from_slice(&decrypted[..len]);
@@ -231,14 +234,14 @@ impl GcmCrypt {
 
         // Read from the tag part to fill the tag buffer
         if !tag_buf.is_empty() {
-            self.tag.extend_from_slice(&tag_buf[..tag_bytes]);
+            self.tag.extend_from_slice(&tag_buf[..tag_len]);
         }
 
         // Verify the tag once available
         if self.has_tag() {
             // Set the tag
             // TODO: do not unwrap, but try error
-            self.crypter.set_tag(&self.tag).unwrap();
+            self.crypter.set_tag(&self.tag).expect("failed to set AES-GCM tag for validation");
 
             // Create a buffer for any remaining data
             let block_size = self.cipher.block_size();
@@ -246,7 +249,8 @@ impl GcmCrypt {
 
             // Finalize, write all remaining data
             // TODO: do not unwrap, but try error
-            let len = self.crypter.finalize(&mut extra).unwrap();
+            let len = self.crypter.finalize(&mut extra)
+                .expect("failed to finalize AES-GCM crypter");
             out.extend_from_slice(&extra[..len]);
 
             // Set the verified flag
@@ -254,16 +258,12 @@ impl GcmCrypt {
             // self.verified = true;
         }
 
-        // Update consumed input bytes counter
-        let len = data_buf.len() + min(tag_buf.len(), TAG_LEN);
-        self.cur += len;
-
         let out = if !out.is_empty() {
             Some(out)
         } else {
             None
         };
-        (len, out)
+        (consumed, out)
     }
 }
 
@@ -534,71 +534,3 @@ impl Write for EceWriter {
         self.inner.flush()
     }
 }
-
-
-
-
-
-
-
-// /// The writer trait implementation.
-// impl Write for EceEncrypter {
-//     fn write(&mut self, buf: &[u8]) -> Result<usize, io::Error> {
-//         // Do not write anything if the tag was already written
-//         if self.verified() || self.has_tag() {
-//             return Ok(0);
-//         }
-
-//         // Determine how many file and tag bytes we still need to process
-//         let file_bytes = max(self.len - TAG_LEN - self.cur, 0);
-//         let tag_bytes = TAG_LEN - self.tag_buf.len();
-
-//         // Split the input buffer
-//         let (file_buf, tag_buf) = buf.split_at(min(file_bytes, buf.len()));
-
-//         // Read from the file buf
-//         if !file_buf.is_empty() {
-//             // Create a decrypted buffer, with the proper size
-//             let block_size = self.cipher.block_size();
-//             let mut decrypted = vec![0u8; file_bytes + block_size];
-
-//             // Decrypt bytes
-//             // TODO: catch error in below statement
-//             let len = self.crypter.update(file_buf, &mut decrypted)?;
-
-//             // Write to the file
-//             self.file.write_all(&decrypted[..len])?;
-//         }
-
-//         // Read from the tag part to fill the tag buffer
-//         if !tag_buf.is_empty() {
-//             self.tag_buf.extend(tag_buf.iter().take(tag_bytes));
-//         }
-
-//         // Verify the tag once it has been buffered completely
-//         if self.has_tag() {
-//             // Set the tag
-//             self.crypter.set_tag(&self.tag_buf)?;
-
-//             // Create a buffer for any remaining data
-//             let block_size = self.cipher.block_size();
-//             let mut extra = vec![0u8; block_size];
-
-//             // Finalize, write all remaining data
-//             let len = self.crypter.finalize(&mut extra)?;
-//             self.file.write_all(&extra[..len])?;
-
-//             // Set the verified flag
-//             self.verified = true;
-//         }
-
-//         // Compute how many bytes were written
-//         let len = file_buf.len() + min(tag_buf.len(), TAG_LEN);
-//         self.cur += len;
-//         Ok(len)
-//     }
-
-//     fn flush(&mut self) -> Result<(), io::Error> {
-//         self.file.flush()
-//     }
-// }
