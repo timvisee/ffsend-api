@@ -90,10 +90,10 @@ pub struct GcmCrypt {
     /// The crypter used for encryping or decrypting feeded data.
     crypter: OpenSslCrypter,
 
-    /// How many bytes have been encrypted or decrypted.
+    /// How many bytes have been encrypted or decrypted, excluding the tag bytes.
     cur: usize,
 
-    /// The total size of the data to encrypt or decrypt, excluding the tag size.
+    /// The total size of the data to encrypt or decrypt, excluding the tag bytes.
     len: usize,
 
     /// Data tag, used for verification.
@@ -209,11 +209,11 @@ impl GcmCrypt {
         }
 
         // How many data and tag bytes we need to read, read chunks from input
-        let data_len = max(self.len - self.cur, 0);
+        let data_len = self.len - self.cur;
         let tag_len = TAG_LEN - self.tag.len();
         let consumed = min(data_len + tag_len, input.len());
         let (data_buf, tag_buf) = input.split_at(min(data_len, input.len()));
-        self.cur += consumed;
+        self.cur += min(consumed, self.len);
 
         let mut out = Vec::new();
 
@@ -380,8 +380,13 @@ impl CryptWrite<GcmCrypt> for GcmWriter {
 
 impl Write for GcmWriter {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        // TODO: implement reader
-        panic!("not yet implemented");
+        // Transform input data through crypter, write result to inner writer
+        let (read, data) = self.crypt.crypt(buf);
+        if let Some(data) = data {
+            self.inner.write_all(&data)?;
+        }
+
+        Ok(read)
     }
 
     fn flush(&mut self) -> io::Result<()> {
