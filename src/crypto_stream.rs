@@ -397,21 +397,21 @@ impl Write for GcmWriter {
 }
 
 impl PipeLen for GcmReader {
-    fn len_in(&self) -> Option<usize> {
+    fn len_in(&self) -> usize {
         self.crypt.len_in()
     }
 
-    fn len_out(&self) -> Option<usize> {
+    fn len_out(&self) -> usize {
         self.crypt.len_out()
     }
 }
 
 impl PipeLen for GcmWriter {
-    fn len_in(&self) -> Option<usize> {
+    fn len_in(&self) -> usize {
         self.crypt.len_in()
     }
 
-    fn len_out(&self) -> Option<usize> {
+    fn len_out(&self) -> usize {
         self.crypt.len_out()
     }
 }
@@ -586,6 +586,9 @@ pub trait Pipe: Sized {
 
     /// Pipe bytes from `input`, monitor/transform it, return the output.
     ///
+    /// This should not be used directly, and is automatically used by a `PipeRead` or `PipeWrite`
+    /// object for the actual piping.
+    ///
     /// This returns a tuple with the number of bytes read from the `input`, along with transformed
     /// data if available in the following format: `(read_bytes, transformed_data)`.
     ///
@@ -594,6 +597,9 @@ pub trait Pipe: Sized {
     fn pipe(&mut self, input: &[u8]) -> (usize, Option<Vec<u8>>);
 
     /// Transparently pipe `input` by immediately returning it.
+    ///
+    /// This should not be used directly, and is automatically used by a `PipeRead` or `PipeWrite`
+    /// object for the actual piping.
     ///
     /// This can be used as helper function inside the `pipe` function if data is only monitored
     /// and not transformed.
@@ -619,32 +625,32 @@ pub trait PipeWrite<P>: Write
     fn new(pipe: P, inner: Box<dyn Write>) -> Self;
 }
 
-/// Defines number of bytes transformed into/out of pipe if constant and known.
+/// Defines number of bytes transformed into/out of pipe if fixed.
 ///
 /// For example, the AES-GCM cryptography pipe adds 16 bytes to the encrypted payload for the
 /// verification tag. When transforming a file the length is known.
 /// Then, the `len_out` for an AES-GCM encrypter is 16 bytes larger than `len_in`.
 /// For a decrypter this is the other way around.
 pub trait PipeLen {
-    /// The number of bytes that are transfered into the pipe if constant and known.
-    fn len_in(&self) -> Option<usize>;
+    /// The number of bytes that are transfered into the pipe if fixed.
+    fn len_in(&self) -> usize;
 
-    /// The number of bytes that are transfered out of the pipe if constant and known.
-    fn len_out(&self) -> Option<usize>;
+    /// The number of bytes that are transfered out of the pipe if fixed.
+    fn len_out(&self) -> usize;
 }
 
 impl PipeLen for GcmCrypt {
-    fn len_in(&self) -> Option<usize> {
+    fn len_in(&self) -> usize {
         match self.mode {
-            CryptMode::Encrypt => Some(self.len),
-            CryptMode::Decrypt => Some(self.len + GCM_TAG_SIZE),
+            CryptMode::Encrypt => self.len,
+            CryptMode::Decrypt => self.len + GCM_TAG_SIZE,
         }
     }
 
-    fn len_out(&self) -> Option<usize> {
+    fn len_out(&self) -> usize {
         match self.mode {
-            CryptMode::Encrypt => Some(self.len + GCM_TAG_SIZE),
-            CryptMode::Decrypt => Some(self.len),
+            CryptMode::Encrypt => self.len + GCM_TAG_SIZE,
+            CryptMode::Decrypt => self.len,
         }
     }
 }
@@ -654,11 +660,11 @@ impl PipeLen for GcmCrypt {
 //     where R: CryptRead<C>,
 //           C: Crypt + PipeLen,
 // {
-//     fn len_in(&self) -> Option<usize> {
+//     fn len_in(&self) -> usize {
 //         self.crypt.len_in()
 //     }
 //
-//     fn len_out(&self) -> Option<usize> {
+//     fn len_out(&self) -> usize {
 //         self.crypt.len_out()
 //     }
 // }
