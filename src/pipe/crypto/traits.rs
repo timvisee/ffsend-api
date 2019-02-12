@@ -1,25 +1,6 @@
-use openssl::symm::Mode as OpenSslMode;
+//! Cryptographic pipe traits.
 
 use crate::pipe::Pipe;
-
-/// The cryptographic mode for a crypter: encrypt or decrypt.
-#[derive(Debug, Clone, Copy)]
-pub enum CryptMode {
-    /// Encrypt data while transforming.
-    Encrypt,
-
-    /// Decrypt data while transforming.
-    Decrypt,
-}
-
-impl Into<OpenSslMode> for CryptMode {
-    fn into(self) -> OpenSslMode {
-        match self {
-            CryptMode::Encrypt => OpenSslMode::Encrypt,
-            CryptMode::Decrypt => OpenSslMode::Decrypt,
-        }
-    }
-}
 
 /// Pipe specialisation trait for cryptographic pipes.
 pub trait Crypt: Pipe {

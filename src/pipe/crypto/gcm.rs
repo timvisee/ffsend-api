@@ -1,3 +1,5 @@
+//! AES-GCM encrypter/decrypter pipe implementation.
+
 use std::cmp::min;
 use std::io::{self, Read, Write};
 

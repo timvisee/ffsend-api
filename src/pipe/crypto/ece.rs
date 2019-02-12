@@ -1,3 +1,5 @@
+//! ECE encrypter/decrypter pipe implementation.
+
 use std::io::{self, Read, Write};
 use std::cmp::min;
 

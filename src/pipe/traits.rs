@@ -1,3 +1,5 @@
+//! Pipe traits.
+
 use std::io::{Read, Write};
 
 /// Something that can pipe given data.
