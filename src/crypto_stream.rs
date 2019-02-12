@@ -15,7 +15,7 @@ use openssl::symm::{
 };
 
 /// The length in bytes of AES-GCM crytographic tags that are used.
-const TAG_LEN: usize = 16;
+const GCM_TAG_LEN: usize = 16;
 
 /// The cryptographic mode for a crypter: encrypt or decrypt.
 #[derive(Debug, Clone, Copy)]
@@ -101,9 +101,13 @@ pub struct GcmCrypt {
 }
 
 impl GcmCrypt {
-    /// TODO: specify function
+    /// Construct a new AES-GCM crypter.
     ///
-    /// TODO: specify usage of `key` and `iv`
+    /// The `mode` parameter defines whether this encrypts or decrypts.
+    /// The length of the payload to encrypt or decrypt must be given to `len`, this excludes the
+    /// appended verification tag on the encrypted payload.
+    ///
+    /// The crypto `key` and input vector `iv` must also be given.
     pub fn new(mode: CryptMode, len: usize, key: &[u8], iv: &[u8]) -> Self {
         // Select the cipher and crypter to use
         // TODO: do not unwrap here
@@ -117,7 +121,7 @@ impl GcmCrypt {
             crypter,
             cur: 0,
             len,
-            tag: Vec::with_capacity(TAG_LEN),
+            tag: Vec::with_capacity(GCM_TAG_LEN),
         }
     }
 
@@ -125,26 +129,26 @@ impl GcmCrypt {
     ///
     /// The size in bytes of the data to encrypt must be given as `len`.
     ///
-    /// TODO: specify usage of `key` and `iv`
+    /// The encryption `key` and input vector `iv` must also be given.
     pub fn encrypt(len: usize, key: &[u8], iv: &[u8]) -> Self {
         Self::new(CryptMode::Encrypt, len, key, iv)
     }
 
     /// Create an AES-GCM decryptor.
     ///
-    /// The size in bytes of the data to decrypt must be given as `len`, which includes the size
-    /// of the suffixed tag.
+    /// The size in bytes of the data to decrypt must be given as `len`, including the size of the
+    /// suffixed tag.
     ///
     /// The decryption `key` and input vector `iv` must also be given.
     pub fn decrypt(len: usize, key: &[u8], iv: &[u8]) -> Self {
-        assert!(len < TAG_LEN, "failed to create AES-GCM decryptor, encrypted payload too small");
-        Self::new(CryptMode::Decrypt, len - TAG_LEN, key, iv)
+        assert!(len > GCM_TAG_LEN, "failed to create AES-GCM decryptor, encrypted payload too small");
+        Self::new(CryptMode::Decrypt, len - GCM_TAG_LEN, key, iv)
     }
 
     /// Check whether we have the whole tag.
     /// When decrypting, this means all data has been processed and the suffixed tag was obtained.
     pub fn has_tag(&self) -> bool {
-        self.tag.len() >= TAG_LEN
+        self.tag.len() >= GCM_TAG_LEN
     }
 
     /// Encrypt the given `input` data using this configured crypter.
@@ -172,16 +176,25 @@ impl GcmCrypt {
         // Transform input data through crypter, collect output
         // TODO: do not unwrap here, but try error
         let mut out = vec![0u8; len + block_size];
-        let out_len = self.crypter.update(&input, &mut out).unwrap();
+        let out_len = self.crypter.update(&input, &mut out)
+            .expect("failed to update AES-GCM encrypter with new data");
         out.truncate(out_len);
 
         // Finalize the crypter when all data is encrypted, append finalized to output
         // TODO: do not unwrap in here, but try error
         if self.cur >= self.len && !self.has_tag() {
+            // Allocate tag space
+            self.tag = vec![0u8; GCM_TAG_LEN];
+
             let mut out_final = vec![0u8; block_size];
-            let final_len = self.crypter.finalize(&mut out_final).unwrap();
+            let final_len = self.crypter.finalize(&mut out_final)
+                .expect("failed to finalize AES-GCM encrypter");
             out.extend_from_slice(&out_final[..final_len]);
-            self.crypter.get_tag(&mut self.tag).unwrap();
+            self.crypter.get_tag(&mut self.tag)
+                .expect("failed to get AES-GCM encrypter tag for validation");
+
+            // Append tag to output
+            out.extend_from_slice(&self.tag);
         }
 
         (len, Some(out))
@@ -206,7 +219,7 @@ impl GcmCrypt {
 
         // How many data and tag bytes we need to read, read chunks from input
         let data_len = self.len - self.cur;
-        let tag_len = TAG_LEN - self.tag.len();
+        let tag_len = GCM_TAG_LEN - self.tag.len();
         let consumed = min(data_len + tag_len, input.len());
         let (data_buf, tag_buf) = input.split_at(min(data_len, input.len()));
         self.cur += min(consumed, self.len);
@@ -222,7 +235,7 @@ impl GcmCrypt {
             // Decrypt bytes
             // TODO: do not unwrap, but try error
             let len = self.crypter.update(data_buf, &mut decrypted)
-                .expect("failed to update AES-GCM crypter with new data");
+                .expect("failed to update AES-GCM decrypter with new data");
 
             // Add decrypted bytes to output
             out.extend_from_slice(&decrypted[..len]);
@@ -237,7 +250,7 @@ impl GcmCrypt {
         if self.has_tag() {
             // Set the tag
             // TODO: do not unwrap, but try error
-            self.crypter.set_tag(&self.tag).expect("failed to set AES-GCM tag for validation");
+            self.crypter.set_tag(&self.tag).expect("failed to set AES-GCM decrypter tag for validation");
 
             // Create a buffer for any remaining data
             let block_size = self.cipher.block_size();
@@ -246,7 +259,7 @@ impl GcmCrypt {
             // Finalize, write all remaining data
             // TODO: do not unwrap, but try error
             let len = self.crypter.finalize(&mut extra)
-                .expect("failed to finalize AES-GCM crypter");
+                .expect("failed to finalize AES-GCM decrypter");
             out.extend_from_slice(&extra[..len]);
         }
 
@@ -318,15 +331,23 @@ impl Read for GcmReader {
         }
 
         // Attempt to fill input buffer if has capacity
-        let capacity = self.buf_in.capacity() - self.buf_in.len();
+        // TODO: capacity might shrink!
+        // TODO: define proper minimum capacity here!
+        if self.buf_in.capacity() < 1000 {
+            self.buf_in.reserve(1000 - self.buf_in.len());
+            dbg!(self.buf_in.capacity());
+        }
+        let mut capacity = self.buf_in.capacity() - self.buf_in.len();
         if capacity > 0 {
             // Read from inner to input buffer
             let mut inner_buf = vec![0u8; capacity];
             let read = self.inner.read(&mut inner_buf)?;
-            self.buf_in.put(inner_buf);
+            // TODO: use put instead, doesn't grow capacity?
+            // self.buf_in.put(inner_buf[..read]);
+            self.buf_in.extend_from_slice(&inner_buf[..read]);
 
-            // If not enough input buffer data, we can't crypt, read nothing
-            if read < capacity {
+            // If nothing is read, return the same
+            if read == 0 {
                 return Ok(0);
             }
         }
@@ -359,6 +380,16 @@ impl Read for GcmReader {
     }
 }
 
+impl PipeLen for GcmReader {
+    fn len_in(&self) -> Option<usize> {
+        self.crypt.len_in()
+    }
+
+    fn len_out(&self) -> Option<usize> {
+        self.crypt.len_out()
+    }
+}
+
 impl CryptWrite<GcmCrypt> for GcmWriter {
     fn new(crypt: GcmCrypt, inner: Box<dyn Write>) -> Self {
         Self {
@@ -384,6 +415,16 @@ impl Write for GcmWriter {
     fn flush(&mut self) -> io::Result<()> {
         // TODO: implement this, flush as much as possible from buffer
         self.inner.flush()
+    }
+}
+
+impl PipeLen for GcmWriter {
+    fn len_in(&self) -> Option<usize> {
+        self.crypt.len_in()
+    }
+
+    fn len_out(&self) -> Option<usize> {
+        self.crypt.len_out()
     }
 }
 
@@ -531,3 +572,46 @@ impl Write for EceWriter {
         self.inner.flush()
     }
 }
+
+/// Defines number of bytes transformed into and out of pipe if known.
+///
+/// For example, the AES-GCM cryptography pipe adds 16 bytes to the encrypted payload for the
+/// verification tag. Therefore the `len_out` for an AES-GCM encrypter is 16 bytes larger than
+/// `len_in`. For a decrypter this is the other way around.
+pub trait PipeLen {
+    /// The number of bytes that are transfered into the pipe if known.
+    fn len_in(&self) -> Option<usize>;
+
+    /// The number of bytes that are transfered out of the pipe if known.
+    fn len_out(&self) -> Option<usize>;
+}
+
+impl PipeLen for GcmCrypt {
+    fn len_in(&self) -> Option<usize> {
+        match self.mode {
+            CryptMode::Encrypt => Some(self.len),
+            CryptMode::Decrypt => Some(self.len + GCM_TAG_LEN),
+        }
+    }
+
+    fn len_out(&self) -> Option<usize> {
+        match self.mode {
+            CryptMode::Encrypt => Some(self.len + GCM_TAG_LEN),
+            CryptMode::Decrypt => Some(self.len),
+        }
+    }
+}
+
+// TODO: use automatic implementation for crypt reader and writer wrapping crypt having pipelen
+// impl<R, C> PipeLen for R
+//     where R: CryptRead<C>,
+//           C: Crypt + PipeLen,
+// {
+//     fn len_in(&self) -> Option<usize> {
+//         self.crypt.len_in()
+//     }
+//
+//     fn len_out(&self) -> Option<usize> {
+//         self.crypt.len_out()
+//     }
+// }
