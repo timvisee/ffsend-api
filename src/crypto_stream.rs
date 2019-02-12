@@ -1,7 +1,6 @@
 // TODO: remove this when publishing
 #![allow(unused)]
 
-// TODO: add verified flag/check to cryptor
 // TODO: add proper error reporting to cryptor
 
 use std::cmp::{self, max, min};
@@ -99,9 +98,6 @@ pub struct GcmCrypt {
     /// Data tag, used for verification.
     /// This is generated during encryption, and consumed during decryption.
     tag: Vec<u8>,
-
-    // TODO: add `verified` flag to keep track if decrypted is verified?
-    // verified: bool,
 }
 
 impl GcmCrypt {
@@ -252,10 +248,6 @@ impl GcmCrypt {
             let len = self.crypter.finalize(&mut extra)
                 .expect("failed to finalize AES-GCM crypter");
             out.extend_from_slice(&extra[..len]);
-
-            // Set the verified flag
-            // TODO: are we still using this?
-            // self.verified = true;
         }
 
         let out = if !out.is_empty() {
