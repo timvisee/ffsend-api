@@ -12,7 +12,11 @@ use crate::api::url::UrlBuilder;
 use crate::crypto::key_set::KeySet;
 use crate::crypto::sig::signature_encoded;
 use crate::file::remote_file::RemoteFile;
-use crate::reader::{EncryptedFileWriter, ProgressReporter, ProgressWriter};
+use crate::pipe::{
+    crypto::GcmCrypt,
+    progress::{ProgressPipe, ProgressWriter, ProgressReporter},
+    prelude::*,
+};
 
 /// A file upload action to a Send server.
 pub struct Download<'a> {
@@ -57,7 +61,7 @@ impl<'a> Download<'a> {
     pub fn invoke(
         mut self,
         client: &Client,
-        reporter: Option<&Arc<Mutex<ProgressReporter>>>,
+        reporter: Option<Arc<Mutex<ProgressReporter>>>,
     ) -> Result<(), Error> {
         // Create a key set for the file
         let mut key = KeySet::from(self.file, self.password.as_ref());
@@ -87,7 +91,7 @@ impl<'a> Download<'a> {
 
         // Create the file writer
         let writer = self
-            .create_file_writer(out, len, &key, reporter)
+            .create_file_writer(out, len, &key, reporter.clone())
             .map_err(|err| Error::File(path_str.clone(), err))?;
 
         // Download the file
@@ -170,25 +174,30 @@ impl<'a> Download<'a> {
         file: File,
         len: u64,
         key: &KeySet,
-        reporter: Option<&Arc<Mutex<ProgressReporter>>>,
-    ) -> Result<ProgressWriter<EncryptedFileWriter>, FileError> {
-        // Build an encrypted writer
-        let mut writer = ProgressWriter::new(
-            EncryptedFileWriter::new(
-                file,
-                len as usize,
-                KeySet::cipher(),
-                key.file_key().unwrap(),
-                key.iv(),
-            )
-            .map_err(|_| FileError::EncryptedWriter)?,
-        )
-        .map_err(|_| FileError::EncryptedWriter)?;
+        reporter: Option<Arc<Mutex<ProgressReporter>>>,
+    ) -> Result<ProgressWriter, FileError> {
+        // TODO: remove old code
 
-        // Set the reporter
-        if let Some(reporter) = reporter {
-            writer.set_reporter(reporter.clone());
-        }
+        // // Build an encrypted writer
+        // let mut writer = ProgressWriter::new(
+        //     EncryptedFileWriter::new(
+        //         file,
+        //         len as usize,
+        //         KeySet::cipher(),
+        //         key.file_key().unwrap(),
+        //         key.iv(),
+        //     )
+        //     .map_err(|_| FileError::EncryptedWriter)?,
+        // )
+        // .map_err(|_| FileError::EncryptedWriter)?;
+
+        // Build the decrypting file writer
+        let decrypt = GcmCrypt::decrypt(len as usize, key.file_key().unwrap(), key.iv());
+        let writer = decrypt.writer(Box::new(file));
+
+        // Build the progress pipe file writer
+        let progress = ProgressPipe::zero(len as u64, reporter);
+        let writer = progress.writer(Box::new(writer));
 
         Ok(writer)
     }
@@ -199,12 +208,12 @@ impl<'a> Download<'a> {
     fn download<R: Read>(
         &self,
         mut reader: R,
-        mut writer: ProgressWriter<EncryptedFileWriter>,
+        mut writer: ProgressWriter,
         len: u64,
-        reporter: Option<&Arc<Mutex<ProgressReporter>>>,
+        reporter: Option<Arc<Mutex<ProgressReporter>>>,
     ) -> Result<(), DownloadError> {
         // Start the writer
-        if let Some(reporter) = reporter {
+        if let Some(reporter) = reporter.as_ref() {
             reporter
                 .lock()
                 .map_err(|_| DownloadError::Progress)?
@@ -215,19 +224,22 @@ impl<'a> Download<'a> {
         io::copy(&mut reader, &mut writer).map_err(|_| DownloadError::Download)?;
 
         // Finish
-        if let Some(reporter) = reporter {
+        if let Some(reporter) = reporter.as_ref() {
             reporter
                 .lock()
                 .map_err(|_| DownloadError::Progress)?
                 .finish();
         }
 
-        // Verify the writer
-        if writer.unwrap().verified() {
-            Ok(())
-        } else {
-            Err(DownloadError::Verify)
-        }
+        // TODO: verify in some other way
+        // // Verify the writer
+        // if writer.unwrap().verified() {
+        //     Ok(())
+        // } else {
+        //     Err(DownloadError::Verify)
+        // }
+
+        Ok(())
     }
 }
 

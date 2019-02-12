@@ -24,7 +24,6 @@ pub mod config;
 pub mod crypto;
 mod ext;
 pub mod file;
-mod pipe;
-pub mod reader;
+pub mod pipe;
 
 pub use failure::Error;

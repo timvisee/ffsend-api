@@ -21,9 +21,11 @@ use crate::crypto::b64;
 use crate::crypto::key_set::KeySet;
 use crate::file::metadata::Metadata;
 use crate::file::remote_file::RemoteFile;
-use crate::reader::{EncryptedFileReader, ExactLengthReader, ProgressReader, ProgressReporter};
-
-type EncryptedReader = ProgressReader<BufReader<EncryptedFileReader>>;
+use crate::pipe::{
+    crypto::{GcmCrypt, GcmReader},
+    progress::{ProgressPipe, ProgressReporter},
+    prelude::*,
+};
 
 /// A file upload action to a Send server.
 pub struct Upload {
@@ -76,7 +78,7 @@ impl Upload {
         // Create metadata and a file reader
         let metadata = self.create_metadata(&key, &file)?;
         let reader = self.create_reader(&key, reporter.cloned())?;
-        let reader_len = reader.len().unwrap();
+        let reader_len = reader.len_in() as u64;
 
         // Create the request to send
         let req = self.create_request(client, &key, &metadata, reader);
@@ -145,34 +147,47 @@ impl Upload {
         &self,
         key: &KeySet,
         reporter: Option<Arc<Mutex<ProgressReporter>>>,
-    ) -> Result<EncryptedReader, Error> {
+    ) -> Result<GcmReader, Error> {
         // Open the file
         let file = match File::open(self.path.as_path()) {
             Ok(file) => file,
             Err(err) => return Err(FileError::Open(err).into()),
         };
 
-        // Create an encrypted reader
-        let reader = match EncryptedFileReader::new(
-            file,
-            KeySet::cipher(),
-            key.file_key().unwrap(),
-            key.iv(),
-        ) {
-            Ok(reader) => reader,
-            Err(_) => return Err(ReaderError::Encrypt.into()),
-        };
+        // TODO: remove old code
 
-        // Buffer the encrypted reader
-        let reader = BufReader::new(reader);
+        // // Create an encrypted reader
+        // let reader = match EncryptedFileReader::new(
+        //     file,
+        //     KeySet::cipher(),
+        //     key.file_key().unwrap(),
+        //     key.iv(),
+        // ) {
+        //     Ok(reader) => reader,
+        //     Err(_) => return Err(ReaderError::Encrypt.into()),
+        // };
 
-        // Wrap into the encrypted reader
-        let mut reader = ProgressReader::new(reader).map_err(|_| ReaderError::Progress)?;
+        // // Buffer the encrypted reader
+        // let reader = BufReader::new(reader);
 
-        // Initialize and attach the reporter
-        if let Some(reporter) = reporter {
-            reader.set_reporter(reporter);
-        }
+        // // Wrap into the encrypted reader
+        // let mut reader = ProgressReader::new(reader).map_err(|_| ReaderError::Progress)?;
+
+        // // Initialize and attach the reporter
+        // if let Some(reporter) = reporter {
+        //     reader.set_reporter(reporter);
+        // }
+
+        // Get the file length
+        let len = file.metadata().expect("failed to fetch file metadata").len();
+
+        // Build the progress pipe file reader
+        let progress = ProgressPipe::zero(len, reporter);
+        let reader = progress.reader(Box::new(file));
+
+        // Build the encrypting file reader
+        let encrypt = GcmCrypt::encrypt(len as usize, key.file_key().unwrap(), key.iv());
+        let reader = encrypt.reader(Box::new(reader));
 
         Ok(reader)
     }
@@ -183,10 +198,10 @@ impl Upload {
         client: &Client,
         key: &KeySet,
         metadata: &[u8],
-        reader: EncryptedReader,
+        reader: GcmReader,
     ) -> Request {
-        // Get the reader length
-        let len = reader.len().expect("failed to get reader length");
+        // Get the reader output length
+        let len = reader.len_out() as u64;
 
         // Configure a form to send
         let part = Part::reader_with_length(reader, len)

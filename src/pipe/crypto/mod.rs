@@ -11,7 +11,7 @@ pub use self::ece::{EceCrypt, EceReader, EceWriter};
 pub use gcm::{GcmCrypt, GcmReader, GcmWriter};
 pub use traits::Crypt;
 
-// Re-export common traits for prelude
+/// Prelude for common crypto pipe traits.
 pub mod prelude {
     pub use super::Crypt;
 }

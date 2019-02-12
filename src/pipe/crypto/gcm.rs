@@ -18,7 +18,7 @@ use super::{Crypt, CryptMode};
 /// The size in bytes of AES-GCM crytographic verification tags.
 const GCM_TAG_SIZE: usize = 16;
 
-/// Some thing that can encrypt or decrypt given data using crypto used AES GCM.
+/// Something that can encrypt or decrypt given data using AES-GCM.
 pub struct GcmCrypt {
     /// The crypto mode, make this encrypt or decrypt data.
     mode: CryptMode,
@@ -85,7 +85,8 @@ impl GcmCrypt {
         Self::new(CryptMode::Decrypt, len - GCM_TAG_SIZE, key, iv)
     }
 
-    /// Check whether we have the whole tag.
+    /// Check if the AES-GCM cryptographic tag is known.
+    ///
     /// When decrypting, this means all data has been processed and the suffixed tag was obtained.
     pub fn has_tag(&self) -> bool {
         self.tag.len() >= GCM_TAG_SIZE
