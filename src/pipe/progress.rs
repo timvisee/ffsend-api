@@ -1,10 +1,7 @@
 use std::cmp::min;
-use std::io::{self, Read, Write};
 use std::sync::{Arc, Mutex};
 
-use bytes::{BufMut, BytesMut};
-
-use crate::pipe::{DEFAULT_BUF_SIZE, prelude::*};
+use crate::pipe::{PipeReader, PipeWriter, prelude::*};
 
 pub struct ProgressPipe {
     /// The current progress.
@@ -55,97 +52,8 @@ impl Pipe for ProgressPipe {
     }
 }
 
-pub struct ProgressReader {
-    pipe: ProgressPipe,
-    inner: Box<dyn Read>,
-    buf: BytesMut,
-}
-
-pub struct ProgressWriter {
-    pipe: ProgressPipe,
-    inner: Box<dyn Write>,
-}
-
-impl PipeRead<ProgressPipe> for ProgressReader {
-    fn new(pipe: ProgressPipe, inner: Box<dyn Read>) -> Self {
-        Self {
-            pipe,
-            inner,
-            buf: BytesMut::with_capacity(DEFAULT_BUF_SIZE),
-        }
-    }
-}
-
-impl PipeWrite<ProgressPipe> for ProgressWriter {
-    fn new(pipe: ProgressPipe, inner: Box<dyn Write>) -> Self {
-        Self {
-            pipe,
-            inner,
-        }
-    }
-}
-
-impl Read for ProgressReader {
-    fn read(&mut self, mut buf: &mut [u8]) -> io::Result<usize> {
-        // Attempt to fill input buffer if has capacity upto default buffer size and output length
-        let capacity = min(DEFAULT_BUF_SIZE, buf.len()) - self.buf.len();
-        if capacity > 0 {
-            // Read from inner to input buffer
-            let mut inner_buf = vec![0u8; capacity];
-            let read = self.inner.read(&mut inner_buf)?;
-            self.buf.extend_from_slice(&inner_buf[..read]);
-
-            // If nothing is read, return the same
-            if read == 0 {
-                return Ok(0);
-            }
-        }
-
-        // Move input buffer into the pipe
-        let (read, out) = self.pipe.pipe(&self.buf);
-        self.buf.split_to(read);
-
-        // Number of bytes written to given buffer
-        let mut total = 0;
-
-        // Write any pipe output to given buffer and remaining to output buffer
-        if let Some(out) = out {
-            // Copy as much data as possible from pipe output to read buffer
-            let write = min(out.len(), buf.len());
-            total += write;
-            buf[..write].copy_from_slice(&out[..write]);
-
-            // Assert there are no unwritten output bytes
-            assert_eq!(write, out.len(), "failed to write all pipe output bytes to output buffer");
-
-            // TODO: is this still valid?
-            // Return if given buffer is full, or slice to unwritten buffer
-            if write == buf.len() {
-                return Ok(total);
-            }
-            buf = &mut buf[write..];
-        }
-
-        // Try again with remaining given buffer
-        self.read(buf).map(|n| n + total)
-    }
-}
-
-impl Write for ProgressWriter {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        // Transform input data through crypter, write result to inner writer
-        let (read, data) = self.pipe.pipe(buf);
-        if let Some(data) = data {
-            self.inner.write_all(&data)?;
-        }
-
-        Ok(read)
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        self.inner.flush()
-    }
-}
+pub type ProgressReader = PipeReader<ProgressPipe>;
+pub type ProgressWriter = PipeWriter<ProgressPipe>;
 
 impl PipeLen for ProgressReader {
     fn len_in(&self) -> usize {
