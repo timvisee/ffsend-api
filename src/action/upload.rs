@@ -1,7 +1,7 @@
 extern crate mime;
 
 use std::fs::File;
-use std::io::{BufReader, Error as IoError};
+use std::io::{BufReader, Error as IoError, Read};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
@@ -22,7 +22,7 @@ use crate::crypto::key_set::KeySet;
 use crate::file::metadata::Metadata;
 use crate::file::remote_file::RemoteFile;
 use crate::pipe::{
-    crypto::{GcmCrypt, GcmReader},
+    crypto::GcmCrypt,
     progress::{ProgressPipe, ProgressReporter},
     prelude::*,
 };
@@ -147,7 +147,7 @@ impl Upload {
         &self,
         key: &KeySet,
         reporter: Option<Arc<Mutex<ProgressReporter>>>,
-    ) -> Result<GcmReader, Error> {
+    ) -> Result<impl Read + PipeLen, Error> {
         // Open the file
         let file = match File::open(self.path.as_path()) {
             Ok(file) => file,
@@ -155,7 +155,6 @@ impl Upload {
         };
 
         // TODO: remove old code
-
         // // Create an encrypted reader
         // let reader = match EncryptedFileReader::new(
         //     file,
@@ -167,16 +166,8 @@ impl Upload {
         //     Err(_) => return Err(ReaderError::Encrypt.into()),
         // };
 
-        // // Buffer the encrypted reader
-        // let reader = BufReader::new(reader);
-
         // // Wrap into the encrypted reader
         // let mut reader = ProgressReader::new(reader).map_err(|_| ReaderError::Progress)?;
-
-        // // Initialize and attach the reporter
-        // if let Some(reporter) = reporter {
-        //     reader.set_reporter(reporter);
-        // }
 
         // Get the file length
         let len = file.metadata().expect("failed to fetch file metadata").len();
@@ -193,13 +184,15 @@ impl Upload {
     }
 
     /// Build the request that will be send to the server.
-    fn create_request(
+    fn create_request<R>(
         &self,
         client: &Client,
         key: &KeySet,
         metadata: &[u8],
-        reader: GcmReader,
-    ) -> Request {
+        reader: R,
+    ) -> Request
+        where R: Read + PipeLen + Send + 'static,
+    {
         // Get the reader output length
         let len = reader.len_out() as u64;
 

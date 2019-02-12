@@ -1,5 +1,5 @@
 use std::fs::File;
-use std::io::{self, Error as IoError, Read};
+use std::io::{self, Error as IoError, Read, Write};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
@@ -14,7 +14,7 @@ use crate::crypto::sig::signature_encoded;
 use crate::file::remote_file::RemoteFile;
 use crate::pipe::{
     crypto::GcmCrypt,
-    progress::{ProgressPipe, ProgressWriter, ProgressReporter},
+    progress::{ProgressPipe, ProgressReporter},
     prelude::*,
 };
 
@@ -175,7 +175,7 @@ impl<'a> Download<'a> {
         len: u64,
         key: &KeySet,
         reporter: Option<Arc<Mutex<ProgressReporter>>>,
-    ) -> Result<ProgressWriter, FileError> {
+    ) -> Result<impl Write, FileError> {
         // TODO: remove old code
 
         // // Build an encrypted writer
@@ -205,13 +205,16 @@ impl<'a> Download<'a> {
     /// Download the file from the reader, and write it to the writer.
     /// The length of the file must also be given.
     /// The status will be reported to the given progress reporter.
-    fn download<R: Read>(
+    fn download<R, W>(
         &self,
         mut reader: R,
-        mut writer: ProgressWriter,
+        mut writer: W,
         len: u64,
         reporter: Option<Arc<Mutex<ProgressReporter>>>,
-    ) -> Result<(), DownloadError> {
+    ) -> Result<(), DownloadError>
+        where R: Read,
+              W: Write,
+    {
         // Start the writer
         if let Some(reporter) = reporter.as_ref() {
             reporter
