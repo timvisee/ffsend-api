@@ -4,7 +4,11 @@ use crate::pipe::Pipe;
 
 mod ece;
 mod gcm;
-pub mod prelude;
+
+// Re-export common traits for prelude
+pub mod prelude {
+    pub use super::Crypt;
+}
 
 // Re-export modules
 pub use gcm::{
