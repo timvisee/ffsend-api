@@ -22,9 +22,9 @@ pub mod action;
 mod api;
 pub mod config;
 pub mod crypto;
-mod crypto_stream;
 mod ext;
 pub mod file;
+mod pipe;
 pub mod reader;
 
 pub use failure::Error;
