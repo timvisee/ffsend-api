@@ -103,16 +103,20 @@ impl Read for EceReader {
             buf = &mut buf[write..];
         }
 
-        // Attempt to fill input buffer if has capacity
-        let capacity = self.buf_in.capacity() - self.buf_in.len();
+        // TODO: define proper chunk size
+        let chunk_size = 100;
+
+        // Attempt to fill input buffer if has capacity upto the chunk size
+        let capacity = chunk_size - self.buf_in.len();
         if capacity > 0 {
             // Read from inner to input buffer
             let mut inner_buf = vec![0u8; capacity];
             let read = self.inner.read(&mut inner_buf)?;
-            self.buf_in.put(inner_buf);
+            self.buf_in.extend_from_slice(&inner_buf[..read]);
 
             // If not enough input buffer data, we can't crypt, read nothing
-            if read < capacity {
+            // TODO: is this correct? can we return or should we keep trying? use read_exact?
+            if read != capacity {
                 return Ok(0);
             }
         }
@@ -147,8 +151,31 @@ impl Read for EceReader {
 
 impl Write for EceWriter {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        // TODO: implement reader
-        panic!("not yet implemented");
+        // TODO: define proper chunk size
+        let chunk_size = 100;
+
+        // Attempt to fill input buffer if has capacity upto the chunk size
+        let capacity = chunk_size - self.buf.len();
+        let mut read = min(capacity, buf.len());
+        if capacity > 0 {
+            self.buf.extend_from_slice(&buf[..read]);
+        }
+
+        // Transform input data through crypter if chunk data is available
+        if self.buf.len() == chunk_size {
+            let (read, data) = self.crypt.crypt(&self.buf.split_off(0));
+            assert_eq!(read, chunk_size, "ECE crypto did not transform full chunk");
+            if let Some(data) = data {
+                self.inner.write_all(&data)?;
+            }
+        }
+
+        // Rerun if there's data left in the input buffer
+        if read < capacity {
+            read += self.write(&buf[read..])?;
+        }
+
+        Ok(read)
     }
 
     fn flush(&mut self) -> io::Result<()> {

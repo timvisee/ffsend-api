@@ -126,7 +126,6 @@ impl<P> Read for PipeReader<P>
             // Assert there are no unwritten output bytes
             assert_eq!(write, out.len(), "failed to write all pipe output bytes to output buffer");
 
-            // TODO: is this still valid?
             // Return if given buffer is full, or slice to unwritten buffer
             if write == buf.len() {
                 return Ok(total);

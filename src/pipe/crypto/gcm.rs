@@ -294,7 +294,7 @@ impl Read for GcmReader {
             buf = &mut buf[write..];
         }
 
-        // Attempt to fill input buffer if has capacity upto default buffer size and max length
+        // Attempt to fill input buffer if has capacity upto default buffer size
         let capacity = DEFAULT_BUF_SIZE - self.buf_in.len();
         if capacity > 0 {
             // Read from inner to input buffer
