@@ -12,10 +12,18 @@ use crate::pipe::{
 };
 use super::{Crypt, CryptMode};
 
+// TODO: specify this somewhere else
+const RS: usize = 1024 * 64;
+
 /// Something that can encrypt or decrypt given data using ECE.
 pub struct EceCrypt {
     mode: CryptMode,
+
+    /// Chunk sequence.
     seq: usize,
+
+    /// The total size in bytes of the plain text payload, excluding any encryption overhead.
+    len: usize,
 
     // TODO: remove this buffer, obsolete?
     /// Input buffer.
@@ -23,11 +31,30 @@ pub struct EceCrypt {
 }
 
 impl EceCrypt {
-    pub fn new(mode: CryptMode, input_size: usize) -> Self {
+    /// Construct a new ECE crypter pipe.
+    pub fn new(mode: CryptMode, len: usize, input_size: usize) -> Self {
         Self {
             mode,
             seq: 0,
+            len,
             buf: BytesMut::with_capacity(input_size),
+        }
+    }
+
+    /// Get the size of the payload chunk.
+    ///
+    /// Data passed to the crypter must match the chunk size.
+    ///
+    /// The chunk size might change during encryption/decryption due to prefixed data.
+    fn chunk_size(&self) -> usize {
+        match self.mode {
+            CryptMode::Encrypt => RS - 17,
+            // TODO: shouldn't this be `21`?
+            CryptMode::Decrypt => if self.seq == 0 {
+                    21
+                } else {
+                    RS
+                },
         }
     }
 }
@@ -37,6 +64,13 @@ impl Pipe for EceCrypt {
     type Writer = EceWriter;
 
     fn pipe(&mut self, input: &[u8]) -> (usize, Option<Vec<u8>>) {
+        // Match the chunk size
+        assert_eq!(
+            input.len(),
+            self.chunk_size(),
+            "input data passed to ECE cryptor does not match chunk size",
+        );
+
         // How much to read, based on capacity that is left and given bytes
         let size = min(self.buf.capacity() - self.buf.len(), input.len());
 
@@ -44,11 +78,35 @@ impl Pipe for EceCrypt {
         self.buf.put(&input[0..size]);
 
         // TODO: encrypt/decrypt bytes, produce the result
-        panic!("not yet implemented");
+        // panic!("not yet implemented");
+
+        dbg!(input.len());
+
+        // Increase the sequence count
+        self.seq += 1;
+
+        self.pipe_transparent(input)
     }
 }
 
 impl Crypt for EceCrypt {}
+
+impl PipeLen for EceCrypt {
+    fn len_in(&self) -> usize {
+        match self.mode {
+            CryptMode::Encrypt => self.len,
+            // TODO: implement this!
+            CryptMode::Decrypt => panic!("failed to calculate size of ECE decrypted payload"),
+        }
+    }
+
+    fn len_out(&self) -> usize {
+        match self.mode {
+            CryptMode::Encrypt => 21 + self.len + 16 * (self.len as f64 / (RS as f64 - 17f64)).floor() as usize,
+            CryptMode::Decrypt => self.len,
+        }
+    }
+}
 
 pub struct EceReader {
     crypt: EceCrypt,
@@ -65,10 +123,12 @@ pub struct EceWriter {
 
 impl PipeRead<EceCrypt> for EceReader {
     fn new(crypt: EceCrypt, inner: Box<dyn Read>) -> Self {
+        let chunk_size = crypt.chunk_size();
+
         Self {
             crypt,
             inner,
-            buf_in: BytesMut::with_capacity(DEFAULT_BUF_SIZE),
+            buf_in: BytesMut::with_capacity(chunk_size),
             buf_out: BytesMut::with_capacity(DEFAULT_BUF_SIZE),
         }
     }
@@ -76,10 +136,12 @@ impl PipeRead<EceCrypt> for EceReader {
 
 impl PipeWrite<EceCrypt> for EceWriter {
     fn new(crypt: EceCrypt, inner: Box<dyn Write>) -> Self {
+        let chunk_size = crypt.chunk_size();
+
         Self {
             crypt,
             inner,
-            buf: BytesMut::with_capacity(DEFAULT_BUF_SIZE),
+            buf: BytesMut::with_capacity(chunk_size),
         }
     }
 }
@@ -103,11 +165,8 @@ impl Read for EceReader {
             buf = &mut buf[write..];
         }
 
-        // TODO: define proper chunk size
-        let chunk_size = 100;
-
         // Attempt to fill input buffer if has capacity upto the chunk size
-        let capacity = chunk_size - self.buf_in.len();
+        let capacity = self.crypt.chunk_size() - self.buf_in.len();
         if capacity > 0 {
             // Read from inner to input buffer
             let mut inner_buf = vec![0u8; capacity];
@@ -151,8 +210,8 @@ impl Read for EceReader {
 
 impl Write for EceWriter {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        // TODO: define proper chunk size
-        let chunk_size = 100;
+        // Get the chunk size to use
+        let chunk_size = self.crypt.chunk_size();
 
         // Attempt to fill input buffer if has capacity upto the chunk size
         let capacity = chunk_size - self.buf.len();
@@ -180,5 +239,25 @@ impl Write for EceWriter {
 
     fn flush(&mut self) -> io::Result<()> {
         self.inner.flush()
+    }
+}
+
+impl PipeLen for EceReader {
+    fn len_in(&self) -> usize {
+        self.crypt.len_in()
+    }
+
+    fn len_out(&self) -> usize {
+        self.crypt.len_out()
+    }
+}
+
+impl PipeLen for EceWriter {
+    fn len_in(&self) -> usize {
+        self.crypt.len_in()
+    }
+
+    fn len_out(&self) -> usize {
+        self.crypt.len_out()
     }
 }
