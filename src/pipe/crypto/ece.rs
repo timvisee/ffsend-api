@@ -44,6 +44,8 @@ pub struct EceCrypt {
     /// Chunk sequence, limited to `u32::MAX`.
     seq: u32,
 
+    cur_in: usize,
+
     cur: usize,
 
     /// The total size in bytes of the plain text payload, excluding any encryption overhead.
@@ -70,6 +72,7 @@ impl EceCrypt {
             // TODO: define salt
             salt: None,
             seq: 0,
+            cur_in: 0,
             cur: 0,
             len,
             rs: RS,
@@ -177,10 +180,11 @@ impl EceCrypt {
             tag,
         ).expect("failed to decrypt ECE chunk");
 
+        let last = self.is_last();
         // TODO: do unpadding
 
         // Update transformed length
-        self.len += out.len();
+        self.cur += out.len();
 
         (input.len(), Some(out))
     }
@@ -259,6 +263,15 @@ impl EceCrypt {
     fn has_header(&self) -> bool {
         self.salt.is_some()
     }
+
+    fn len_encrypted(&self) -> usize {
+        21 + self.len + 16 * (self.len as f64 / (RS as f64 - 17f64)).floor() as usize
+    }
+
+    // If ready to process last chunk
+    fn is_last(&self) -> bool {
+        self.cur_in >= self.len_in()
+    }
 }
 
 impl Pipe for EceCrypt {
@@ -266,12 +279,17 @@ impl Pipe for EceCrypt {
     type Writer = EceWriter;
 
     fn pipe(&mut self, input: &[u8]) -> (usize, Option<Vec<u8>>) {
+        // Increase input byte counter
+        self.cur_in += input.len();
+
         // Assert the chunk size
-        assert_eq!(
-            input.len() as u32,
-            self.chunk_size(),
-            "input data passed to ECE cryptor does not match chunk size",
-        );
+        if !self.is_last() {
+            assert_eq!(
+                input.len() as u32,
+                self.chunk_size(),
+                "input data passed to ECE cryptor does not match chunk size",
+            );
+        }
 
         // Get the header first before decrypting
         match self.mode {
@@ -303,13 +321,13 @@ impl PipeLen for EceCrypt {
         match self.mode {
             CryptMode::Encrypt => self.len,
             // TODO: implement this!
-            CryptMode::Decrypt => panic!("failed to calculate size of ECE decrypted payload"),
+            CryptMode::Decrypt => self.len_encrypted(),
         }
     }
 
     fn len_out(&self) -> usize {
         match self.mode {
-            CryptMode::Encrypt => 21 + self.len + 16 * (self.len as f64 / (RS as f64 - 17f64)).floor() as usize,
+            CryptMode::Encrypt => self.len_encrypted(),
             CryptMode::Decrypt => self.len,
         }
     }
@@ -326,6 +344,8 @@ pub struct EceWriter {
     crypt: EceCrypt,
     inner: Box<dyn Write>,
     buf: BytesMut,
+
+    tmp: usize,
 }
 
 impl PipeRead<EceCrypt> for EceReader {
@@ -349,6 +369,8 @@ impl PipeWrite<EceCrypt> for EceWriter {
             crypt,
             inner,
             buf: BytesMut::with_capacity(chunk_size),
+
+            tmp: 0,
         }
     }
 }
@@ -425,6 +447,7 @@ impl Write for EceWriter {
         let mut read = min(capacity, buf.len());
         if capacity > 0 {
             self.buf.extend_from_slice(&buf[..read]);
+            self.tmp += read;
         }
 
         // Transform input data through crypter if chunk data is available
@@ -436,10 +459,13 @@ impl Write for EceWriter {
             }
         }
 
-        // // Rerun if there's data left in the input buffer
-        // if read < capacity {
-        //     read += self.write(&buf[read..])?;
-        // }
+        // If all expected data is provided, make sure to finish the last partial chunk
+        // TODO: somehow use is_last
+        if self.tmp >= self.len_in() {
+            if let (_, Some(data)) = self.crypt.crypt(&self.buf.split_off(0)) {
+                self.inner.write_all(&data)?;
+            }
+        }
 
         Ok(read)
     }
