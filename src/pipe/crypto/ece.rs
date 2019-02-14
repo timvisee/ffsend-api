@@ -19,6 +19,7 @@ const RS: u32 = 1024 * 64;
 
 const SALT_LENGTH: usize = 16;
 const KEY_LENGTH: usize = 16;
+const TAG_LENGTH: usize = 16;
 const RS_LENGTH: usize = 4;
 
 // Defined by ECE standard
@@ -42,6 +43,8 @@ pub struct EceCrypt {
 
     /// Chunk sequence, limited to `u32::MAX`.
     seq: u32,
+
+    cur: usize,
 
     /// The total size in bytes of the plain text payload, excluding any encryption overhead.
     len: usize,
@@ -67,6 +70,7 @@ impl EceCrypt {
             // TODO: define salt
             salt: None,
             seq: 0,
+            cur: 0,
             len,
             rs: RS,
             // buf: BytesMut::with_capacity(DEFAULT_BUF_SIZE),
@@ -84,10 +88,10 @@ impl EceCrypt {
         match self.mode {
             CryptMode::Encrypt => self.rs - 17,
             // TODO: shouldn't this be `21`? Use `ECE_AES128GCM_HEADER_LENGTH` instead?
-            CryptMode::Decrypt => if self.seq == 0 {
-                    21
-                } else {
+            CryptMode::Decrypt => if self.has_header() {
                     self.rs
+                } else {
+                    21
                 },
         }
     }
@@ -156,27 +160,27 @@ impl EceCrypt {
         //     panic!("could not write to AES-GCM decrypter, exceeding specified lenght");
         // }
 
-        // Parse the first chunk as header data
-        if self.seq == 0 {
-            self.pipe_decrypt_header(input);
-            return (input.len(), None);
-            // TODO: increase len?
-        }
-
         // Generate the decryption nonce
         let nonce = self.generate_nonce(self.seq);
+
+        // Split input into data and tag parts
+        let data = &input[..input.len() - TAG_LENGTH];
+        let tag = &input[input.len() - TAG_LENGTH..input.len()];
 
         // Decrypt the chunk
         let out = symm::decrypt_aead(
             symm::Cipher::aes_128_gcm(),
             self.key.as_ref().expect("no key"),
             Some(&nonce),
-            &[], // TODO: aad?
-            input,
-            &[], // TODO: tag?
+            &[],
+            data,
+            tag,
         ).expect("failed to decrypt ECE chunk");
 
         // TODO: do unpadding
+
+        // Update transformed length
+        self.len += out.len();
 
         (input.len(), Some(out))
     }
@@ -215,15 +219,22 @@ impl EceCrypt {
         ));
 
         // TODO: remove after debugging
+        dbg!(&self.salt);
         dbg!(self.rs);
         dbg!(key_id_len);
         dbg!(length);
+        dbg!(&self.key);
+        dbg!(&self.nonce);
 
         // Assert all header bytes have been consumed
         // TODO: Not valid? Header may be longer?
         assert!(input.is_empty(), "failed to decrypt, not all ECE header bytes are used");
     }
 
+    /// Generate crypto nonce for sequence with index `seq`.
+    ///
+    /// Each payload chunk uses a different nonce.
+    /// This method generates the nonce to use.
     fn generate_nonce(&self, seq: u32) -> Vec<u8> {
         // Get the base nonce which we need to modify
         let mut nonce = self.nonce.clone().expect("failed to generate nonce, no base nonce available");
@@ -239,6 +250,15 @@ impl EceCrypt {
 
         nonce
     }
+
+    /// Check whehter the header is read.
+    ///
+    /// This checks whether the header has been read from the input while decrypting.
+    /// The header contains important information for the rest of the decryption process and must
+    /// be obtained and parsed first.
+    fn has_header(&self) -> bool {
+        self.salt.is_some()
+    }
 }
 
 impl Pipe for EceCrypt {
@@ -253,6 +273,15 @@ impl Pipe for EceCrypt {
             "input data passed to ECE cryptor does not match chunk size",
         );
 
+        // Get the header first before decrypting
+        match self.mode {
+            CryptMode::Decrypt if !self.has_header() => {
+                self.pipe_decrypt_header(input);
+                return (input.len(), None);
+            },
+            _ => {},
+        }
+
         // Encrypt or decrypt depending on the mode
         let result = match self.mode {
             CryptMode::Encrypt => self.pipe_encrypt(input),
@@ -260,7 +289,7 @@ impl Pipe for EceCrypt {
         };
 
         // Increase the sequence count
-        self.seq  = self.seq.checked_add(1)
+        self.seq = self.seq.checked_add(1)
             .expect("failed to crypt ECE payload, record sequence number exceeds limit");
 
         result
@@ -399,7 +428,7 @@ impl Write for EceWriter {
         }
 
         // Transform input data through crypter if chunk data is available
-        if self.buf.len() == chunk_size {
+        if self.buf.len() >= chunk_size {
             let (read, data) = self.crypt.crypt(&self.buf.split_off(0));
             assert_eq!(read, chunk_size, "ECE crypto did not transform full chunk");
             if let Some(data) = data {
@@ -407,10 +436,10 @@ impl Write for EceWriter {
             }
         }
 
-        // Rerun if there's data left in the input buffer
-        if read < capacity {
-            read += self.write(&buf[read..])?;
-        }
+        // // Rerun if there's data left in the input buffer
+        // if read < capacity {
+        //     read += self.write(&buf[read..])?;
+        // }
 
         Ok(read)
     }
