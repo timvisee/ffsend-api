@@ -1,9 +1,9 @@
 #[macro_use]
 extern crate arrayref;
+extern crate byteorder;
 extern crate bytes;
 #[macro_use]
 extern crate derive_builder;
-extern crate ece;
 extern crate failure;
 #[macro_use]
 extern crate failure_derive;
