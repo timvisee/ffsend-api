@@ -180,8 +180,9 @@ impl EceCrypt {
             tag,
         ).expect("failed to decrypt ECE chunk");
 
+        // Unpad the decrypted payload
         let last = self.is_last();
-        // TODO: do unpadding
+        let out = Self::unpad(&out, last).to_vec();
 
         // Update transformed length
         self.cur += out.len();
@@ -222,14 +223,6 @@ impl EceCrypt {
             Some(ECE_AES128GCM_NONCE_INFO.as_bytes()),
         ));
 
-        // TODO: remove after debugging
-        dbg!(&self.salt);
-        dbg!(self.rs);
-        dbg!(key_id_len);
-        dbg!(length);
-        dbg!(&self.key);
-        dbg!(&self.nonce);
-
         // Assert all header bytes have been consumed
         // TODO: Not valid? Header may be longer?
         assert!(input.is_empty(), "failed to decrypt, not all ECE header bytes are used");
@@ -246,9 +239,6 @@ impl EceCrypt {
         let nonce_len = nonce.len();
         let m = BigEndian::read_u32(&nonce[nonce_len - 4..nonce_len]);
         let xor = m ^ seq;
-
-        // TODO: remove after debugging
-        dbg!(xor);
 
         BigEndian::write_u32(&mut nonce[nonce_len - 4..nonce_len], xor);
 
@@ -271,6 +261,25 @@ impl EceCrypt {
     // If ready to process last chunk
     fn is_last(&self) -> bool {
         self.cur_in >= self.len_in()
+    }
+
+    // fn pad(plaintext: &[u8], block_pad_len: usize, last_record: bool) -> Result<Vec<u8>> {
+    //     let mut block = Vec::with_capacity(plaintext.len() + 1 /* delimiter */ + block_pad_len);
+    //     block.extend_from_slice(plaintext);
+    //     block.push(if last_record { 2 } else { 1 });
+    //     let padding = vec![0u8; block_pad_len];
+    //     block.extend(padding);
+    //     Ok(block)
+    // }
+
+    fn unpad(block: &[u8], last_record: bool) -> &[u8] {
+        let pos = match block.iter().rposition(|&b| b != 0) {
+            Some(pos) => pos,
+            None => panic!("ciphertext is zero"),
+        };
+        let expected_delim = if last_record { 2 } else { 1 };
+        assert_eq!(block[pos], expected_delim, "ECE decrypt depadding failure");
+        &block[..pos]
     }
 }
 
