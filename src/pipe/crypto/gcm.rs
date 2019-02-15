@@ -1,4 +1,4 @@
-//! AES-GCM encrypter/decrypter pipe implementation.
+//! AES-GCM 128 encrypter/decrypter pipe implementation for Firefox Send v1.
 
 use std::cmp::min;
 use std::io::{self, Read, Write};
@@ -15,8 +15,8 @@ use crate::pipe::{
 };
 use super::{Crypt, CryptMode};
 
-/// The size in bytes of AES-GCM crytographic verification tags.
-const GCM_TAG_SIZE: usize = 16;
+/// The size in bytes of crytographic verification tags.
+const TAG_LEN: usize = 16;
 
 /// Something that can encrypt or decrypt given data using AES-GCM.
 pub struct GcmCrypt {
@@ -29,10 +29,10 @@ pub struct GcmCrypt {
     /// The crypter used for encryping or decrypting feeded data.
     crypter: OpenSslCrypter,
 
-    /// How many bytes have been encrypted or decrypted, excluding the tag bytes.
+    /// The number of encrypted/decrypted plaintext bytes.
     cur: usize,
 
-    /// The total size of the data to encrypt or decrypt, excluding the tag bytes.
+    /// The total size in bytes of the plaintext.
     len: usize,
 
     /// Data tag, used for verification.
@@ -61,7 +61,7 @@ impl GcmCrypt {
             crypter,
             cur: 0,
             len,
-            tag: Vec::with_capacity(GCM_TAG_SIZE),
+            tag: Vec::with_capacity(TAG_LEN),
         }
     }
 
@@ -81,15 +81,15 @@ impl GcmCrypt {
     ///
     /// The decryption `key` and input vector `iv` must also be given.
     pub fn decrypt(len: usize, key: &[u8], iv: &[u8]) -> Self {
-        assert!(len > GCM_TAG_SIZE, "failed to create AES-GCM decryptor, encrypted payload too small");
-        Self::new(CryptMode::Decrypt, len - GCM_TAG_SIZE, key, iv)
+        assert!(len > TAG_LEN, "failed to create AES-GCM decryptor, encrypted payload too small");
+        Self::new(CryptMode::Decrypt, len - TAG_LEN, key, iv)
     }
 
     /// Check if the AES-GCM cryptographic tag is known.
     ///
     /// When decrypting, this means all data has been processed and the suffixed tag was obtained.
     pub fn has_tag(&self) -> bool {
-        self.tag.len() >= GCM_TAG_SIZE
+        self.tag.len() >= TAG_LEN
     }
 
     /// Encrypt the given `input` data using this configured crypter.
@@ -123,7 +123,7 @@ impl GcmCrypt {
         // TODO: do not unwrap in here, but try error
         if self.cur >= self.len && !self.has_tag() {
             // Allocate tag space
-            self.tag = vec![0u8; GCM_TAG_SIZE];
+            self.tag = vec![0u8; TAG_LEN];
 
             let mut out_final = vec![0u8; block_size];
             let final_len = self.crypter.finalize(&mut out_final)
@@ -141,8 +141,8 @@ impl GcmCrypt {
 
     /// Decrypt the given `input` payload using this configured crypter.
     ///
-    /// This function returns `(read, out)` where `read` represents the number of read bytes from
-    /// `input`, and `out` is a vector of now encrypted bytes.
+    /// This function returns `(read, plaintext)` where `read` represents the number of read bytes from
+    /// `input`, and `plaintext` is a vector of the produced plaintext.
     ///
     /// # Panics
     ///
@@ -156,12 +156,12 @@ impl GcmCrypt {
 
         // How many data and tag bytes we need to read, read chunks from input
         let data_len = self.len - self.cur;
-        let tag_len = GCM_TAG_SIZE - self.tag.len();
+        let tag_len = TAG_LEN - self.tag.len();
         let consumed = min(data_len + tag_len, input.len());
         let (data_buf, tag_buf) = input.split_at(min(data_len, input.len()));
         self.cur += min(consumed, self.len);
 
-        let mut out = Vec::new();
+        let mut plaintext = Vec::new();
 
         // Read from the data buffer
         if !data_buf.is_empty() {
@@ -175,7 +175,7 @@ impl GcmCrypt {
                 .expect("failed to update AES-GCM decrypter with new data");
 
             // Add decrypted bytes to output
-            out.extend_from_slice(&decrypted[..len]);
+            plaintext.extend_from_slice(&decrypted[..len]);
         }
 
         // Read from the tag part to fill the tag buffer
@@ -197,15 +197,15 @@ impl GcmCrypt {
             // TODO: do not unwrap, but try error
             let len = self.crypter.finalize(&mut extra)
                 .expect("failed to finalize AES-GCM decrypter");
-            out.extend_from_slice(&extra[..len]);
+            plaintext.extend_from_slice(&extra[..len]);
         }
 
-        let out = if !out.is_empty() {
-            Some(out)
+        let plaintext = if !plaintext.is_empty() {
+            Some(plaintext)
         } else {
             None
         };
-        (consumed, out)
+        (consumed, plaintext)
     }
 }
 
@@ -227,13 +227,13 @@ impl PipeLen for GcmCrypt {
     fn len_in(&self) -> usize {
         match self.mode {
             CryptMode::Encrypt => self.len,
-            CryptMode::Decrypt => self.len + GCM_TAG_SIZE,
+            CryptMode::Decrypt => self.len + TAG_LEN,
         }
     }
 
     fn len_out(&self) -> usize {
         match self.mode {
-            CryptMode::Encrypt => self.len + GCM_TAG_SIZE,
+            CryptMode::Encrypt => self.len + TAG_LEN,
             CryptMode::Decrypt => self.len,
         }
     }
