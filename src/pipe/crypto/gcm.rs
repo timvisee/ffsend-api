@@ -43,6 +43,9 @@ pub struct GcmCrypt {
 impl GcmCrypt {
     /// Construct a new AES-GCM crypter.
     ///
+    /// It is highly recommended to use the [`encrypt()`](Self::encrypt) and
+    /// [`decrypt()`](Self::decrypt) methods instead for constructing a new crypter.
+    ///
     /// The `mode` parameter defines whether this encrypts or decrypts.
     /// The length of the payload to encrypt or decrypt must be given to `len`, this excludes the
     /// appended verification tag on the encrypted payload.

@@ -7,7 +7,10 @@ use byteorder::{BigEndian, ByteOrder};
 use bytes::{Bytes, BytesMut};
 use openssl::symm;
 
-use crate::crypto::hkdf::hkdf;
+use crate::crypto::{
+    hkdf::hkdf,
+    rand_bytes,
+};
 use crate::pipe::{
     DEFAULT_BUF_SIZE,
     prelude::*,
@@ -90,15 +93,19 @@ pub struct EceCrypt {
 impl EceCrypt {
     /// Construct a new ECE crypter pipe.
     ///
+    /// It is highly recommended to use the [`encrypt()`](Self::encrypt) and
+    /// [`decrypt()`](Self::decrypt) methods instead for constructing a new crypter.
+    ///
     /// The size in bytes of the plaintext data must be given as `len`.
     /// The input key material must be given as `ikm`.
-    pub fn new(mode: CryptMode, len: usize, ikm: Vec<u8>) -> Self {
+    /// When encrypting, a `salt` must be specified.
+    pub fn new(mode: CryptMode, len: usize, ikm: Vec<u8>, salt: Option<Vec<u8>>) -> Self {
         Self {
             mode,
             ikm,
             key: None,
             nonce: None,
-            salt: None,
+            salt,
             seq: 0,
             cur_in: 0,
             cur: 0,
@@ -111,8 +118,20 @@ impl EceCrypt {
     ///
     /// The size in bytes of the plaintext data that is encrypted decrypt must be given as `len`.
     /// The input key material must be given as `ikm`.
-    pub fn encrypt(len: usize, ikm: Vec<u8>) -> Self {
-        Self::new(CryptMode::Encrypt, len, ikm)
+    /// The `salt` is optional and will be randomly generated if `None`.
+    pub fn encrypt(len: usize, ikm: Vec<u8>, salt: Option<Vec<u8>>) -> Self {
+        // Construct the encrypter, generate random salt if not set
+        let mut crypt = Self::new(
+            CryptMode::Encrypt,
+            len,
+            ikm,
+            salt.or_else(|| Some(generate_salt())),
+        );
+
+        // Derive the key and nonce
+        crypt.derive_key_and_nonce();
+
+        crypt
     }
 
     /// Create an ECE decryptor.
@@ -120,7 +139,7 @@ impl EceCrypt {
     /// The size in bytes of the plaintext data that is decrypted decrypt must be given as `len`.
     /// The input key material must be given as `ikm`.
     pub fn decrypt(len: usize, ikm: Vec<u8>) -> Self {
-        Self::new(CryptMode::Decrypt, len, ikm)
+        Self::new(CryptMode::Decrypt, len, ikm, None)
     }
 
     /// Get the current desired size of a payload chunk.
@@ -138,59 +157,101 @@ impl EceCrypt {
         }
     }
 
-    /// Encrypt the given `input` data using this configured crypter.
+    /// Encrypt the given `plaintext` data using this configured crypter.
+    ///
+    /// If a header hasn't been created yet, it is included in the output as well.
     ///
     /// This function returns `(read, out)` where `read` represents the number of read bytes from
-    /// `input`, and `out` is a vector of now encrypted bytes.
+    /// `plaintext`, and `out` is a vector of now encrypted bytes.
     ///
     /// # Panics
     ///
     /// Panics if attempted to write more bytes than the length specified while configuring the
     /// crypter.
-    fn encrypt_chunk(&mut self, input: &[u8]) -> (usize, Option<Vec<u8>>) {
-        // // Don't allow encrypting more than specified, when tag is obtained
-        // if self.has_tag() && !input.is_empty() {
-        //     panic!("could not write to AES-GCM encrypter, exceeding specified length");
-        // }
+    fn pipe_encrypt(&mut self, input: &[u8]) -> (usize, Option<Vec<u8>>) {
+        // Encrypt the chunk, if the first chunk, the header must be created and prefixed
+        if !self.has_header() {
+            // Create header
+            let mut ciphertext = self.create_header();
 
-        // // Find input length and block size, increase current bytes counter
-        // let len = input.len();
-        // let block_size = self.cipher.block_size();
-        // self.cur += len;
+            // Encrypt chunk and append to header base ciphertext
+            let (read, chunk) = self.encrypt_chunk(input);
+            if let Some(chunk) = chunk {
+                ciphertext.extend_from_slice(&chunk)
+            }
 
-        // // Transform input data through crypter, collect output
-        // // TODO: do not unwrap here, but try error
-        // let mut out = vec![0u8; len + block_size];
-        // let out_len = self.crypter.update(&input, &mut out)
-        //     .expect("failed to update AES-GCM encrypter with new data");
-        // out.truncate(out_len);
-
-        // // Finalize the crypter when all data is encrypted, append finalized to output
-        // // TODO: do not unwrap in here, but try error
-        // if self.cur >= self.len && !self.has_tag() {
-        //     // Allocate tag space
-        //     self.tag = vec![0u8; GCM_TAG_SIZE];
-
-        //     let mut out_final = vec![0u8; block_size];
-        //     let final_len = self.crypter.finalize(&mut out_final)
-        //         .expect("failed to finalize AES-GCM encrypter");
-        //     out.extend_from_slice(&out_final[..final_len]);
-        //     self.crypter.get_tag(&mut self.tag)
-        //         .expect("failed to get AES-GCM encrypter tag for validation");
-
-        //     // Append tag to output
-        //     out.extend_from_slice(&self.tag);
-        // }
-
-        // (len, Some(out))
-
-        panic!("not yet implemented");
+            (read, Some(ciphertext))
+        } else {
+            self.encrypt_chunk(input)
+        }
     }
 
     /// Decrypt the given `ciphertext` using ECE crypto.
     ///
+    /// If the header has not been read yet, it is parsed first to initialize the proper salt and
+    /// record size.
+    ///
     /// This function returns `(read, plaintext)` where `read` represents the number of read bytes from
     /// `ciphertext`, and `out` is a vector of the producted plaintext.
+    ///
+    /// # Panics
+    ///
+    /// Panics if attempted to write more bytes than the length specified while configuring the
+    /// crypter, or if decryption of a chunk failed.
+    /// size.
+    fn pipe_decrypt(&mut self, input: &[u8]) -> (usize, Option<Vec<u8>>) {
+        // Parse the header before decrypting anything
+        if !self.has_header() {
+            self.parse_header(input);
+            return (input.len(), None);
+        }
+
+        // Decrypt the chunk
+        self.decrypt_chunk(input)
+    }
+
+    /// Encrypt the given `plaintext` chunk data using this configured crypter.
+    ///
+    /// This function returns `(read, out)` where `read` represents the number of read bytes from
+    /// `plaintext`, and `out` is a vector of now encrypted bytes.
+    ///
+    /// # Panics
+    ///
+    /// Panics if attempted to write more bytes than the length specified while configuring the
+    /// crypter.
+    fn encrypt_chunk(&mut self, plaintext: &[u8]) -> (usize, Option<Vec<u8>>) {
+        // // Don't allow encrypting more than specified, when tag is obtained
+        // if self.has_tag() && !plaintext.is_empty() {
+        //     panic!("could not write to AES-GCM encrypter, exceeding specified length");
+        // }
+
+        // Update transformed length, own plain text
+        self.cur += plaintext.len();
+        let mut plaintext = plaintext.to_vec();
+
+        // Generate the encryption nonce, split ciphertext into payload and tag
+        let nonce = self.generate_nonce(self.seq);
+
+        // Pad the plaintext, encrypt the chunk, append tag
+        pad(&mut plaintext, self.rs as usize, self.is_last());
+        let mut tag = vec![0u8; TAG_LEN];
+        let mut ciphertext = symm::encrypt_aead(
+            symm::Cipher::aes_128_gcm(),
+            self.key.as_ref().expect("no key"),
+            Some(&nonce),
+            &[],
+            &plaintext,
+            &mut tag,
+        ).expect("failed to decrypt ECE chunk");
+        ciphertext.extend_from_slice(&tag);
+
+        (plaintext.len(), Some(ciphertext))
+    }
+
+    /// Decrypt the given `ciphertext` chunk using ECE crypto.
+    ///
+    /// This function returns `(read, plaintext)` where `read` represents the number of read bytes
+    /// from `ciphertext`, and `out` is a vector of the producted plaintext.
     ///
     /// # Panics
     ///
@@ -223,6 +284,34 @@ impl EceCrypt {
         (ciphertext.len(), Some(plaintext))
     }
 
+    /// Create the ECE crypto header.
+    ///
+    /// This header includes the salt and record size as configured in this crypter instance.
+    /// The header bytes are returned.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the salt is not set.
+    fn create_header(&self) -> Vec<u8> {
+        // Allocate the header
+        let mut header = Vec::with_capacity(HEADER_LEN as usize);
+
+        // Add the salt
+        let salt = self.salt.as_ref().expect("failed to create ECE header, no crypto salt specified");
+        assert_eq!(salt.len(), SALT_LEN);
+        header.extend_from_slice(salt);
+
+        // Add the record size
+        let mut rs = [0u8; 4];
+        BigEndian::write_u32(&mut rs, self.rs);
+        header.extend_from_slice(&rs);
+
+        // Add length of unused key ID length
+        header.push(0);
+
+        header
+    }
+
     /// Parse the given header bytes as ECE crypto header.
     ///
     /// This function attemts to parse the given header bytes.
@@ -234,7 +323,7 @@ impl EceCrypt {
     ///
     /// Panics if the given header bytes have an invalid size, or if the given header is not fully
     /// parsed.
-    fn pipe_decrypt_header(&mut self, header: &[u8]) {
+    fn parse_header(&mut self, header: &[u8]) {
         // Assert the minimum header chunk size
         assert!(
             header.len() as u32 >= HEADER_LEN,
@@ -253,6 +342,21 @@ impl EceCrypt {
         let _length = key_id_len + KEY_LEN + 5;
 
         // Derive the key and nonce
+        self.derive_key_and_nonce();
+
+        // Assert all header bytes have been consumed
+        // TODO: Not valid? Header may include other things?
+        assert!(header.is_empty(), "failed to decrypt, not all ECE header bytes are used");
+    }
+
+    /// Derive the crypto key and base nonce.
+    ///
+    /// These are derived based on `self.salt` and `self.ikm`, and must be configured.
+    ///
+    /// # Panics
+    ///
+    /// panics if either `self.salt` or `self.ikm` is not configured.
+    fn derive_key_and_nonce(&mut self) {
         self.key = Some(hkdf(
             self.salt.as_ref().map(|s| s.as_slice()),
             KEY_LEN,
@@ -265,10 +369,6 @@ impl EceCrypt {
             &self.ikm,
             Some(NONCE_INFO.as_bytes()),
         ));
-
-        // Assert all header bytes have been consumed
-        // TODO: Not valid? Header may include other things?
-        assert!(header.is_empty(), "failed to decrypt, not all ECE header bytes are used");
     }
 
     /// Generate crypto nonce for sequence with index `seq`.
@@ -293,8 +393,13 @@ impl EceCrypt {
     /// This checks whether the header has been read from the input while decrypting.
     /// The header contains important information for the rest of the decryption process and must
     /// be obtained and parsed first.
+    ///
+    /// TODO: better docs
     fn has_header(&self) -> bool {
-        self.salt.is_some()
+        match self.mode {
+            CryptMode::Encrypt => self.cur > 0,
+            CryptMode::Decrypt => self.salt.is_some(),
+        }
     }
 
     /// Check if working with the last crypto chunk.
@@ -322,25 +427,7 @@ impl Pipe for EceCrypt {
         // Increase input byte counter
         self.cur_in += input.len();
 
-        // Assert the chunk size
-        if !self.is_last() {
-            assert_eq!(
-                input.len() as u32,
-                self.chunk_size(),
-                "input data passed to ECE cryptor does not match chunk size",
-            );
-        }
-
-        // Get the header first before decrypting
-        match self.mode {
-            CryptMode::Decrypt if !self.has_header() => {
-                self.pipe_decrypt_header(input);
-                return (input.len(), None);
-            },
-            _ => {},
-        }
-
-        // Encrypt or decrypt depending on the mode
+        // Use mode specific pipe function
         let result = match self.mode {
             CryptMode::Encrypt => self.encrypt_chunk(input),
             CryptMode::Decrypt => self.decrypt_chunk(input),
@@ -528,6 +615,9 @@ impl PipeLen for EceWriter {
     }
 }
 
+unsafe impl Send for EceReader {}
+unsafe impl Send for EceWriter {}
+
 /// Pad a plaintext chunk for ECE encryption.
 ///
 /// Padding is a required step for ECE encryption.
@@ -537,9 +627,18 @@ impl PipeLen for EceWriter {
 /// If this is the last chunk that will be encrypted, `last` must be `true`.
 ///
 /// This internally suffixes a padding delimiter to the block, and the padding bytes itself.
-fn pad(block: &mut Vec<u8>, pad_len: usize, last: bool) {
-    block.push(if last { 2 } else { 1 });
-    block.extend(vec![0u8; pad_len]);
+fn pad(block: &mut Vec<u8>, rs: usize, last: bool) {
+    // Assert the data fits the records
+    assert!(block.len() + TAG_LEN < rs, "failed to pad ECE ciphertext, data too large for record size");
+
+    // Pad chunks with 1 delimiter and zeros, pad last chunk with single 2 delimiter
+    if !last {
+        let mut pad = vec![0u8; rs - block.len() - TAG_LEN];
+        pad[0] = 1;
+        block.extend(pad);
+    } else {
+        block.push(2);
+    }
 }
 
 /// Unpad an decrypted ECE ciphertext chunk.
@@ -558,6 +657,13 @@ fn unpad(block: &mut Vec<u8>, last: bool) {
 
     // Truncate the padded bytes
     block.truncate(pos);
+}
+
+/// Generate a random salt for encryption.
+fn generate_salt() -> Vec<u8> {
+    let mut salt = vec![0u8; SALT_LEN];
+    rand_bytes(&mut salt).expect("failed to generate encryption salt");
+    salt
 }
 
 /// Calcualte approximate length of ECE encrypted data.
