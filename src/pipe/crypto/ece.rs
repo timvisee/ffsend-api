@@ -89,7 +89,10 @@ pub struct EceCrypt {
 
 impl EceCrypt {
     /// Construct a new ECE crypter pipe.
-    pub fn new(mode: CryptMode, ikm: Vec<u8>, len: usize) -> Self {
+    ///
+    /// The size in bytes of the plaintext data must be given as `len`.
+    /// The input key material must be given as `ikm`.
+    pub fn new(mode: CryptMode, len: usize, ikm: Vec<u8>) -> Self {
         Self {
             mode,
             ikm,
@@ -104,7 +107,21 @@ impl EceCrypt {
         }
     }
 
-    // TODO: create encrypt and decrypt specific constructor, like in the AES-GCM pipe
+    /// Create an ECE encryptor.
+    ///
+    /// The size in bytes of the plaintext data that is encrypted decrypt must be given as `len`.
+    /// The input key material must be given as `ikm`.
+    pub fn encrypt(len: usize, ikm: Vec<u8>) -> Self {
+        Self::new(CryptMode::Encrypt, len, ikm)
+    }
+
+    /// Create an ECE decryptor.
+    ///
+    /// The size in bytes of the plaintext data that is decrypted decrypt must be given as `len`.
+    /// The input key material must be given as `ikm`.
+    pub fn decrypt(len: usize, ikm: Vec<u8>) -> Self {
+        Self::new(CryptMode::Decrypt, len, ikm)
+    }
 
     /// Get the current desired size of a payload chunk.
     ///
@@ -232,8 +249,8 @@ impl EceCrypt {
         self.rs = BigEndian::read_u32(&header.split_to(RS_LEN));
 
         // Extracted in Send v2 code, but doesn't seem to be used
-        // let key_id_len = header.split_to(1)[0] as usize;
-        // let length = key_id_len + KEY_LEN + 5;
+        let key_id_len = header.split_to(1)[0] as usize;
+        let _length = key_id_len + KEY_LEN + 5;
 
         // Derive the key and nonce
         self.key = Some(hkdf(
@@ -280,9 +297,20 @@ impl EceCrypt {
         self.salt.is_some()
     }
 
-    // If ready to process last chunk
+    /// Check if working with the last crypto chunk.
+    ///
+    /// This checks whether all data for the last chunk, determined by the plaintext length in
+    /// bytes, has entered this crypto pipe.
     fn is_last(&self) -> bool {
-        self.cur_in >= self.len_in()
+        self.is_last_with(0)
+    }
+
+    /// Check if working with the last crypto chunk including given `extra` bytes.
+    ///
+    /// This checks whether all data for the last chunk including `extra`, determined by the
+    /// plaintext length in bytes, has entered this crypto pipe.
+    fn is_last_with(&self, extra: usize) -> bool {
+        self.cur_in + extra >= self.len_in()
     }
 }
 
@@ -355,8 +383,6 @@ pub struct EceWriter {
     crypt: EceCrypt,
     inner: Box<dyn Write>,
     buf: BytesMut,
-
-    tmp: usize,
 }
 
 impl PipeRead<EceCrypt> for EceReader {
@@ -380,8 +406,6 @@ impl PipeWrite<EceCrypt> for EceWriter {
             crypt,
             inner,
             buf: BytesMut::with_capacity(chunk_size),
-
-            tmp: 0,
         }
     }
 }
@@ -458,7 +482,6 @@ impl Write for EceWriter {
         let read = min(capacity, buf.len());
         if capacity > 0 {
             self.buf.extend_from_slice(&buf[..read]);
-            self.tmp += read;
         }
 
         // Transform input data through crypter if chunk data is available
@@ -471,8 +494,7 @@ impl Write for EceWriter {
         }
 
         // If all expected data is provided, make sure to finish the last partial chunk
-        // TODO: somehow use is_last
-        if self.tmp >= self.len_in() {
+        if self.crypt.is_last_with(self.buf.len()) {
             if let (_, Some(data)) = self.crypt.crypt(&self.buf.split_off(0)) {
                 self.inner.write_all(&data)?;
             }
