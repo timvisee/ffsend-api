@@ -75,7 +75,6 @@ pub struct EceCrypt {
     /// When decrypting, this corresponds to the number of ciphertext bytes including the header.
     ///
     /// Used to determine when the last chunk is reached.
-    /// This value is used to determine 
     cur_in: usize,
 
     /// The number of encrypted/decrypted plaintext bytes.
@@ -148,7 +147,10 @@ impl EceCrypt {
     /// Data passed to the crypter must match the chunk size.
     fn chunk_size(&self) -> u32 {
         match self.mode {
-            CryptMode::Encrypt => self.rs - 17,
+            // Record size with tag length and delimiter
+            CryptMode::Encrypt => self.rs - TAG_LEN as u32 - 1,
+
+            // Record size, header length for initial header chunk
             CryptMode::Decrypt => if self.has_header() {
                     self.rs
                 } else {
@@ -168,7 +170,7 @@ impl EceCrypt {
     ///
     /// Panics if attempted to write more bytes than the length specified while configuring the
     /// crypter.
-    fn pipe_encrypt(&mut self, input: &[u8]) -> (usize, Option<Vec<u8>>) {
+    fn pipe_encrypt(&mut self, input: Vec<u8>) -> (usize, Option<Vec<u8>>) {
         // Encrypt the chunk, if the first chunk, the header must be created and prefixed
         if !self.has_header() {
             // Create header
@@ -219,15 +221,15 @@ impl EceCrypt {
     ///
     /// Panics if attempted to write more bytes than the length specified while configuring the
     /// crypter.
-    fn encrypt_chunk(&mut self, plaintext: &[u8]) -> (usize, Option<Vec<u8>>) {
+    fn encrypt_chunk(&mut self, mut plaintext: Vec<u8>) -> (usize, Option<Vec<u8>>) {
         // // Don't allow encrypting more than specified, when tag is obtained
         // if self.has_tag() && !plaintext.is_empty() {
         //     panic!("could not write to AES-GCM encrypter, exceeding specified length");
         // }
 
-        // Update transformed length, own plain text
-        self.cur += plaintext.len();
-        let mut plaintext = plaintext.to_vec();
+        // Update transformed length
+        let read = plaintext.len();
+        self.cur += read;
 
         // Generate the encryption nonce, split ciphertext into payload and tag
         let nonce = self.generate_nonce(self.seq);
@@ -242,10 +244,10 @@ impl EceCrypt {
             &[],
             &plaintext,
             &mut tag,
-        ).expect("failed to decrypt ECE chunk");
+        ).expect("failed to encrypt ECE chunk");
         ciphertext.extend_from_slice(&tag);
 
-        (plaintext.len(), Some(ciphertext))
+        (read, Some(ciphertext))
     }
 
     /// Decrypt the given `ciphertext` chunk using ECE crypto.
@@ -429,8 +431,8 @@ impl Pipe for EceCrypt {
 
         // Use mode specific pipe function
         let result = match self.mode {
-            CryptMode::Encrypt => self.encrypt_chunk(input),
-            CryptMode::Decrypt => self.decrypt_chunk(input),
+            CryptMode::Encrypt => self.pipe_encrypt(input.to_vec()),
+            CryptMode::Decrypt => self.pipe_decrypt(input),
         };
 
         // Increase the sequence count
@@ -660,7 +662,7 @@ fn unpad(block: &mut Vec<u8>, last: bool) {
 }
 
 /// Generate a random salt for encryption.
-fn generate_salt() -> Vec<u8> {
+pub fn generate_salt() -> Vec<u8> {
     let mut salt = vec![0u8; SALT_LEN];
     rand_bytes(&mut salt).expect("failed to generate encryption salt");
     salt
@@ -670,6 +672,6 @@ fn generate_salt() -> Vec<u8> {
 ///
 /// This function attempts to approximate the length in bytes of an ECE ciphertext.
 /// The length in bytes of the plaintext must be given as `len`.
-fn len_encrypted(len: usize) -> usize {
-    21 + len + 16 * (len as f64 / (RS as f64 - 17f64)).floor() as usize
+pub fn len_encrypted(len: usize) -> usize {
+    HEADER_LEN as usize + len + 16 * (len as f64 / (RS as f64 - 17f64)).floor() as usize
 }
