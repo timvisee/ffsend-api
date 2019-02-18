@@ -24,6 +24,7 @@ pub mod config;
 pub mod crypto;
 mod ext;
 pub mod file;
+mod io;
 pub mod pipe;
 
 pub use failure::Error;

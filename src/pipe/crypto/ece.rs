@@ -188,13 +188,9 @@ impl EceCrypt {
 
             (read, Some(ciphertext))
         } else {
-            // encrypt chunk, increase chunk sequence number
+            // Encrypt chunk, increase chunk sequence number
             let result = self.encrypt_chunk(input);
             self.increase_seq();
-
-            dbg!(&self.cur_in);
-            dbg!(self.len_out());
-
             result
         }
     }
