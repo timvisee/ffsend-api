@@ -483,13 +483,13 @@ impl PipeLen for EceCrypt {
     fn len_in(&self) -> usize {
         match self.mode {
             CryptMode::Encrypt => self.len,
-            CryptMode::Decrypt => len_encrypted(self.len),
+            CryptMode::Decrypt => len_encrypted(self.len, self.rs as usize),
         }
     }
 
     fn len_out(&self) -> usize {
         match self.mode {
-            CryptMode::Encrypt => len_encrypted(self.len),
+            CryptMode::Encrypt => len_encrypted(self.len, self.rs as usize),
             CryptMode::Decrypt => self.len,
         }
     }
@@ -702,17 +702,15 @@ pub fn generate_salt() -> Vec<u8> {
     salt
 }
 
-/// Calcualte approximate length of ECE encrypted data.
+/// Calcualte length of ECE encrypted data.
 ///
-/// This function attempts to approximate the length in bytes of an ECE ciphertext.
-/// The length in bytes of the plaintext must be given as `len`.
-pub fn len_encrypted(len: usize) -> usize {
-    // HEADER_LEN as usize + len + 16 * (len as f64 / (RS as f64 - 17f64)).floor() as usize
-
-    let rs_data = RS as usize - TAG_LEN - 1;
-
-    let header = HEADER_LEN as usize;
+/// This function calculates the length in bytes of the ECE ciphertext.
+/// The record size and length in bytes of the plaintext must be given as `rs` and `len`.
+pub fn len_encrypted(len: usize, rs: usize) -> usize {
     let chunk_meta = TAG_LEN + 1;
+    let chunk_data = rs - chunk_meta;
+    let header = HEADER_LEN as usize;
+    let chunks = (len as f64 / chunk_data as f64).ceil() as usize;
 
-    header + len + (chunk_meta * (len / rs_data))
+    header + len + chunk_meta * chunks
 }
