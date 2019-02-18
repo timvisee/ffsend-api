@@ -126,6 +126,14 @@ impl Upload {
 
         eprintln!("### starting upload");
 
+        // Read the header chunk and send it
+        // TODO: use size from constant
+        let mut header = vec![0u8; 21];
+        reader.read_exact(&mut header).expect("failed to read header from reader");
+        ws_client.send_message(
+            &OwnedMessage::Binary(header),
+        ).expect("failed to send header chunk");
+
         // TODO: do not use hard coded value
         reader.chunks(64 * 1024).enumerate().for_each(|(i, chunk)| {
             let chunk = chunk.expect("invalid chunk");
