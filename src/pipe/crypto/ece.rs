@@ -7,6 +7,7 @@ use byteorder::{BigEndian, ByteOrder};
 use bytes::{Bytes, BytesMut};
 use openssl::symm;
 
+use crate::config;
 use crate::crypto::{
     hkdf::hkdf,
     rand_bytes,
@@ -20,7 +21,7 @@ use super::{Crypt, CryptMode};
 /// The default record size in bytes to use for encryption.
 ///
 /// This value matches the default configured in the Firefox Send v2 source code.
-const RS: u32 = 1024 * 64;
+const RS: u32 = config::ECE_RECORD_SIZE;
 
 /// The crypto key length.
 const KEY_LEN: usize = 16;

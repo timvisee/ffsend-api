@@ -1,5 +1,3 @@
-extern crate hyper;
-
 use mime_guess::Mime;
 use serde_json;
 
@@ -45,16 +43,28 @@ impl Metadata {
     /// Construct metadata from the given properties.
     ///
     /// Parameters:
-    /// * iv: initialisation vector
-    /// * name: file name
-    /// * mime: file mimetype
-    ///
-    // TODO: make this function compatible with Send v2 too.
+    /// * `iv`: initialisation vector
+    /// * `name`: file name
+    /// * `mime`: file mimetype
     pub fn from(iv: &[u8], name: String, mime: &Mime) -> Self {
         Metadata::V1 {
             iv: b64::encode(iv),
             name,
             mime: mime.to_string(),
+        }
+    }
+
+    /// Construct metadata from the given properties.
+    ///
+    /// Parameters:
+    /// * `name`: file name
+    /// * `mime`: file mimetype
+    /// * `size`: file size
+    pub fn from_send2(name: String, mime: &Mime, size: u64) -> Self {
+        Metadata::V2 {
+            name,
+            mime: mime.to_string(),
+            size,
         }
     }
 
