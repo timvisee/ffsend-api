@@ -21,7 +21,7 @@ impl<R: Read> Chunks<R> {
     ///
     /// Panics if the given `size` is zero.
     pub fn from(reader: R, size: usize) -> Self {
-        assert_ne!(size, 0, "buffer size cannot be zero");
+        assert_ne!(size, 0, "chunk size cannot be zero");
         Self {
             reader,
             size,
