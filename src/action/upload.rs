@@ -224,10 +224,36 @@ impl Upload {
     fn create_file_info(&self, key: &KeySet, file: &FileData) -> Result<String, MetaError> {
         // Determine what filename to use, build the metadata
         let name = self.name.clone().unwrap_or_else(|| file.name().to_owned());
-        let metadata = Metadata::from_send2(name, file.mime(), file.size());
+        //let metadata = Metadata::from_send2(name, file.mime(), file.size());
 
-        // TODO: use proper auth data here!
-        let info = FileInfo::from(None, None, metadata, key);
+
+
+        // Construct the metadata
+        let metadata = Metadata::from_send2(name, file.mime(), file.size())
+            .to_json()
+            .into_bytes();
+
+        // Encrypt the metadata
+        let mut metadata_tag = vec![0u8; 16];
+        let mut metadata = match encrypt_aead(
+            KeySet::cipher(),
+            key.meta_key().unwrap(),
+            Some(&[0u8; 12]),
+            &[],
+            &metadata,
+            &mut metadata_tag,
+        ) {
+            Ok(metadata) => metadata,
+            Err(_) => return Err(MetaError::Encrypt),
+        };
+
+        // Append the encryption tag
+        metadata.append(&mut metadata_tag);
+
+
+
+        // TODO: use proper expire and download count configuration here
+        let info = FileInfo::from(None, Some(1), b64::encode(&metadata), key);
 
         Ok(info.to_json())
     }

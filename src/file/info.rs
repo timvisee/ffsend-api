@@ -27,7 +27,7 @@ pub struct FileInfo {
 
     /// File metadata.
     #[serde(rename = "fileMetadata")]
-    metadata: Metadata,
+    metadata: String,
 
     /// File authorization.
     // TODO: what is this?
@@ -46,12 +46,12 @@ impl FileInfo {
     /// Parameters:
     /// * `expire`: optional file expiry time in seconds.
     /// * `download_limit`: optional download limit.
-    /// * `metadata`: file metadata
+    /// * `metadata`: encrypted and base64 encoded file metadata
     /// * `auth`: authorization data
     pub fn from(
         expire: Option<usize>,
         download_limit: Option<u8>,
-        metadata: Metadata,
+        metadata: String,
         key_set: &KeySet,
     ) -> Self {
         Self {
