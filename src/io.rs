@@ -16,6 +16,10 @@ pub struct Chunks<R> {
 
 impl<R: Read> Chunks<R> {
     /// Construct a new chunked iterator over the given reader `reader`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the given `size` is zero.
     pub fn from(reader: R, size: usize) -> Self {
         assert_ne!(size, 0, "buffer size cannot be zero");
         Self {
@@ -42,7 +46,7 @@ impl<B: Read> Iterator for Chunks<B> {
                 // Increase read counter, continue reading
                 Ok(r) => read += r,
 
-                // Yield error
+                // Yield errors
                 Err(e) => return Some(Err(e)),
             }
         }

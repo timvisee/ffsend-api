@@ -557,9 +557,13 @@ impl Read for EceReader {
             let read = self.inner.read(&mut inner_buf)?;
             self.buf_in.extend_from_slice(&inner_buf[..read]);
 
-            // If not enough input buffer data, we can't crypt, read nothing
-            // TODO: is this correct? can we return or should we keep trying? use read_exact?
-            if read != capacity {
+            // Break if nothing is read
+            if read == 0 {
+                return Ok(0);
+            }
+
+            // Break if input buffer isn't full and it isn't the last data, because can't crypt yet
+            if read != capacity && !self.crypt.is_last_with(read) {
                 return Ok(0);
             }
         }
