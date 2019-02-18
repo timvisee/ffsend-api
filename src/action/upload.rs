@@ -1,7 +1,8 @@
 extern crate mime;
 
 use std::fs::File;
-use std::io::{BufReader, Error as IoError, Read};
+use std::io::{self, BufReader, Error as IoError, Read};
+use std::mem;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
@@ -11,6 +12,7 @@ use openssl::symm::encrypt_aead;
 use reqwest::header::AUTHORIZATION;
 use reqwest::multipart::{Form, Part};
 use reqwest::{Client, Error as ReqwestError, Request};
+use serde_json;
 use url::{ParseError as UrlParseError, Url};
 
 use super::params::{Error as ParamsError, Params, ParamsData};
@@ -19,8 +21,12 @@ use crate::api::nonce::header_nonce;
 use crate::api::request::{ensure_success, ResponseError};
 use crate::crypto::b64;
 use crate::crypto::key_set::KeySet;
-use crate::file::metadata::Metadata;
+use crate::file::{
+    info::FileInfo,
+    metadata::Metadata,
+};
 use crate::file::remote_file::RemoteFile;
+use crate::io::{Chunks, ChunkRead};
 use crate::pipe::{
     crypto::{EceCrypt, GcmCrypt},
     progress::{ProgressPipe, ProgressReporter},
@@ -77,11 +83,11 @@ impl Upload {
 
         // Create metadata and a file reader
         let metadata = self.create_metadata(&key, &file)?;
-        let reader = self.create_reader(&key, reporter.cloned())?;
+        let mut reader = self.create_reader(&key, reporter.cloned())?;
         let reader_len = reader.len_in() as u64;
 
-        // Create the request to send
-        let req = self.create_request(client, &key, &metadata, reader);
+        // // create the request to send
+        // let req = self.create_request(client, &key, &metadata, reader);
 
         // Start the reporter
         if let Some(reporter) = reporter {
@@ -91,25 +97,88 @@ impl Upload {
                 .start(reader_len);
         }
 
-        // Execute the request
-        let (result, nonce) = self.execute_request(req, client, &key)?;
 
-        // Mark the reporter as finished
-        if let Some(reporter) = reporter {
-            reporter.lock().map_err(|_| UploadError::Progress)?.finish();
-        }
 
-        // Change the password if set
-        if let Some(password) = self.password {
-            Password::new(&result, &password, nonce.clone()).invoke(client)?;
-        }
+        use websocket::{ClientBuilder, Message, OwnedMessage};
 
-        // Change parameters if set
-        if let Some(params) = self.params {
-            Params::new(&result, params, nonce.clone()).invoke(client)?;
-        }
+        let ws_url = self.host.join("api/ws").expect("invalid host");
 
-        Ok(result)
+        let mut ws_client = ClientBuilder::new(ws_url.as_str())
+            .expect("failed to set up websocket builder")
+            .add_protocol("rust-websocket")
+            // What is this for?
+            .connect_insecure()
+            .expect("failed to build websocket client");
+
+        let file_info = self.create_file_info(&key, &file).expect("failed to create file info for upload");
+        let ws_metadata = OwnedMessage::Text(file_info);
+        ws_client.send_message(&ws_metadata).expect("failed to send metadata message");
+
+        eprintln!("### receiving result");
+        // TODO: handle error results
+        let result = ws_client.recv_message().expect("failed to read result");
+        let upload_response: UploadResponse = match result {
+            OwnedMessage::Text(ref data) => serde_json::from_str(data)
+                .expect("failed to deserialize upload request response"),
+            _ => panic!("failed to request file upload"),
+        };
+        eprintln!("GOT FROM SERVER: {:?}", &upload_response);
+
+        eprintln!("### starting upload");
+
+        // TODO: do not use hard coded value
+        reader.chunks(64 * 1024).enumerate().for_each(|(i, chunk)| {
+            let chunk = chunk.expect("invalid chunk");
+
+            eprintln!("Sending chunk #{} of {} bytes", i, chunk.len());
+
+            ws_client.send_message(
+                &OwnedMessage::Binary(chunk),
+            ).expect("failed to send chunk");
+
+            // TODO: check if we received an error message
+        });
+
+        // Send the file footer
+        ws_client.send_message(
+            &OwnedMessage::Binary(vec![0]),
+        ).expect("failed to send chunk");
+
+        eprintln!("### done uploading");
+
+        // Assert OK! {"ok":true}
+        let result = ws_client.recv_message().expect("failed to get resonse");
+        eprintln!("RESULT: {:?}", result);
+
+        // Done uploading, close upload client
+        ws_client.shutdown().expect("failed to close websocket");
+        mem::drop(ws_client);
+
+        let remote_file = upload_response.into_file(self.host.clone(), &key)
+            .expect("failed to build remote file");
+        return Ok(remote_file);
+
+
+
+        // // Execute the request
+        // let (result, nonce) = self.execute_request(req, client, &key)?;
+
+        // // Mark the reporter as finished
+        // if let Some(reporter) = reporter {
+        //     reporter.lock().map_err(|_| UploadError::Progress)?.finish();
+        // }
+
+        // // Change the password if set
+        // if let Some(password) = self.password {
+        //     Password::new(&result, &password, nonce.clone()).invoke(client)?;
+        // }
+
+        // // Change parameters if set
+        // if let Some(params) = self.params {
+        //     Params::new(&result, params, nonce.clone()).invoke(client)?;
+        // }
+
+        // Ok(result)
     }
 
     /// Create a blob of encrypted metadata.
@@ -140,6 +209,19 @@ impl Upload {
         metadata.append(&mut metadata_tag);
 
         Ok(metadata)
+    }
+
+    /// Create file info to send to the server, used for Firefox Send v2.
+    #[cfg(feature = "send2")]
+    fn create_file_info(&self, key: &KeySet, file: &FileData) -> Result<String, MetaError> {
+        // Determine what filename to use, build the metadata
+        let name = self.name.clone().unwrap_or_else(|| file.name().to_owned());
+        let metadata = Metadata::from_send2(name, file.mime(), file.size());
+
+        // TODO: use proper auth data here!
+        let info = FileInfo::from(None, None, metadata, key);
+
+        Ok(info.to_json())
     }
 
     /// Create a reader that reads the file as encrypted stream.
@@ -273,7 +355,10 @@ struct UploadResponse {
     url: String,
 
     /// The owner key, used to do further file modifications.
-    owner: String,
+    ///
+    /// Called `owner` in Firefox Send v1, and `ownerToken` in Firefox Send v2.
+    #[serde(alias = "ownerToken", alias = "owner")]
+    owner_token: String,
 }
 
 impl UploadResponse {
@@ -286,7 +371,7 @@ impl UploadResponse {
             host,
             Url::parse(&self.url)?,
             key.secret().to_vec(),
-            Some(self.owner),
+            Some(self.owner_token),
         ))
     }
 }
@@ -299,6 +384,9 @@ struct FileData<'a> {
 
     /// The file mime type.
     mime: Mime,
+
+    /// The file size.
+    size: u64,
 }
 
 impl<'a> FileData<'a> {
@@ -315,9 +403,14 @@ impl<'a> FileData<'a> {
             None => "file",
         };
 
+        // Get the file size
+        // TODO: do not unwrap here, handle error
+        let size = path.metadata().expect("failed to determine file length").len();
+
         Ok(Self {
             name,
             mime: guess_mime_type(path),
+            size,
         })
     }
 
@@ -329,6 +422,11 @@ impl<'a> FileData<'a> {
     /// Get the file mime type.
     pub fn mime(&self) -> &Mime {
         &self.mime
+    }
+
+    /// Get the file size in bytes.
+    pub fn size(&self) -> u64 {
+        self.size
     }
 }
 
