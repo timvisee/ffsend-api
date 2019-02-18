@@ -13,7 +13,7 @@ use crate::crypto::key_set::KeySet;
 use crate::crypto::sig::signature_encoded;
 use crate::file::remote_file::RemoteFile;
 use crate::pipe::{
-    crypto::GcmCrypt,
+    crypto::{EceCrypt, GcmCrypt},
     progress::{ProgressPipe, ProgressReporter},
     prelude::*,
 };
@@ -74,7 +74,8 @@ impl<'a> Download<'a> {
             MetadataAction::new(self.file, self.password.clone(), self.check_exists)
                 .invoke(&client)?
         };
-        key.set_iv(metadata.metadata().iv());
+        // TODO: what to do with this? Only set for Send v1?
+        // key.set_iv(metadata.metadata().iv());
 
         // Decide what actual file target to use
         let path = self.decide_path(metadata.metadata().name());
@@ -191,8 +192,11 @@ impl<'a> Download<'a> {
         // )
         // .map_err(|_| FileError::EncryptedWriter)?;
 
+        let ikm = key.secret().to_vec();
+
         // Build the decrypting file writer
-        let decrypt = GcmCrypt::decrypt(len as usize, key.file_key().unwrap(), key.iv());
+        // let decrypt = GcmCrypt::decrypt(len as usize, key.file_key().unwrap(), key.iv());
+        let decrypt = EceCrypt::decrypt(len as usize, ikm);
         let writer = decrypt.writer(Box::new(file));
 
         // Build the progress pipe file writer

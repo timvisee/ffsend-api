@@ -22,7 +22,7 @@ use crate::crypto::key_set::KeySet;
 use crate::file::metadata::Metadata;
 use crate::file::remote_file::RemoteFile;
 use crate::pipe::{
-    crypto::GcmCrypt,
+    crypto::{EceCrypt, GcmCrypt},
     progress::{ProgressPipe, ProgressReporter},
     prelude::*,
 };
@@ -176,8 +176,11 @@ impl Upload {
         let progress = ProgressPipe::zero(len, reporter);
         let reader = progress.reader(Box::new(file));
 
+        let ikm = key.secret().to_vec();
+
         // Build the encrypting file reader
-        let encrypt = GcmCrypt::encrypt(len as usize, key.file_key().unwrap(), key.iv());
+        // let encrypt = GcmCrypt::encrypt(len as usize, key.file_key().unwrap(), key.iv());
+        let encrypt = EceCrypt::encrypt(len as usize, ikm, None);
         let reader = encrypt.reader(Box::new(reader));
 
         Ok(reader)

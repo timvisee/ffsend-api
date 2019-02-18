@@ -184,7 +184,12 @@ impl EceCrypt {
 
             (read, Some(ciphertext))
         } else {
-            self.encrypt_chunk(input)
+            let (a, b) = self.encrypt_chunk(input);
+
+            dbg!(&self.cur_in);
+            dbg!(self.len_out());
+
+            (a, b)
         }
     }
 
@@ -347,7 +352,7 @@ impl EceCrypt {
         self.derive_key_and_nonce();
 
         // Assert all header bytes have been consumed
-        // TODO: Not valid? Header may include other things?
+        // If this fails, update `len_encrypted` as well
         assert!(header.is_empty(), "failed to decrypt, not all ECE header bytes are used");
     }
 
@@ -673,5 +678,12 @@ pub fn generate_salt() -> Vec<u8> {
 /// This function attempts to approximate the length in bytes of an ECE ciphertext.
 /// The length in bytes of the plaintext must be given as `len`.
 pub fn len_encrypted(len: usize) -> usize {
-    HEADER_LEN as usize + len + 16 * (len as f64 / (RS as f64 - 17f64)).floor() as usize
+    // HEADER_LEN as usize + len + 16 * (len as f64 / (RS as f64 - 17f64)).floor() as usize
+
+    let rs_data = RS as usize - TAG_LEN - 1;
+
+    let header = HEADER_LEN as usize;
+    let chunk_meta = TAG_LEN + 1;
+
+    header + len + (chunk_meta * (len / rs_data))
 }
