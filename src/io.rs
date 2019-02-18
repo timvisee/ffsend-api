@@ -37,7 +37,7 @@ impl<B: Read> Iterator for Chunks<B> {
         while read < self.size {
             match self.reader.read(&mut chunk[read..]) {
                 // Yield buffer if nothing could be read
-                Ok(0) => continue,
+                Ok(0) => break,
 
                 // Increase read counter, continue reading
                 Ok(r) => read += r,
@@ -47,9 +47,13 @@ impl<B: Read> Iterator for Chunks<B> {
             }
         }
 
-        // Truncate buffer to just the read bytes
-        chunk.truncate(read);
-        Some(Ok(chunk))
+        // Truncate buffer to read section, return none if nothing was read
+        if read > 0 {
+            chunk.truncate(read);
+            Some(Ok(chunk))
+        } else {
+            None
+        }
     }
 }
 
