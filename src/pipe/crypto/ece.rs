@@ -145,6 +145,7 @@ impl EceCrypt {
     ///
     /// This value is dynamic and changes depending on the crypto mode, and the current stage.
     /// Data passed to the crypter must match the chunk size.
+    #[inline(always)]
     fn chunk_size(&self) -> u32 {
         match self.mode {
             // Record size with tag length and delimiter
@@ -187,15 +188,14 @@ impl EceCrypt {
 
             (read, Some(ciphertext))
         } else {
-            let (a, b) = self.encrypt_chunk(input);
-
-            // Increase chunk sequence number
+            // encrypt chunk, increase chunk sequence number
+            let result = self.encrypt_chunk(input);
             self.increase_seq();
 
             dbg!(&self.cur_in);
             dbg!(self.len_out());
 
-            (a, b)
+            result
         }
     }
 
@@ -219,12 +219,9 @@ impl EceCrypt {
             return (input.len(), None);
         }
 
-        // Decrypt the chunk
+        // Decrypt the chunk, increase chunk sequence number
         let result = self.decrypt_chunk(input);
-
-        // Increase chunk sequence number
         self.increase_seq();
-
         result
     }
 
@@ -237,6 +234,7 @@ impl EceCrypt {
     ///
     /// Panics if attempted to write more bytes than the length specified while configuring the
     /// crypter.
+    #[inline(always)]
     fn encrypt_chunk(&mut self, mut plaintext: Vec<u8>) -> (usize, Option<Vec<u8>>) {
         // // Don't allow encrypting more than specified, when tag is obtained
         // if self.has_tag() && !plaintext.is_empty() {
@@ -255,7 +253,7 @@ impl EceCrypt {
         let mut tag = vec![0u8; TAG_LEN];
         let mut ciphertext = symm::encrypt_aead(
             symm::Cipher::aes_128_gcm(),
-            self.key.as_ref().expect("no key"),
+            self.key.as_ref().expect("failed to encrypt ECE chunk, missing crypto key"),
             Some(&nonce),
             &[],
             &plaintext,
@@ -275,6 +273,7 @@ impl EceCrypt {
     ///
     /// Panics if attempted to write more bytes than the length specified while configuring the
     /// crypter, or if decryption of a chunk failed.
+    #[inline(always)]
     fn decrypt_chunk(&mut self, ciphertext: &[u8]) -> (usize, Option<Vec<u8>>) {
         // // Don't allow decrypting more than specified, when tag is obtained
         // if self.has_tag() && !ciphertext.is_empty() {
@@ -288,7 +287,7 @@ impl EceCrypt {
         // Decrypt the chunk, and unpad decrypted payload
         let mut plaintext = symm::decrypt_aead(
             symm::Cipher::aes_128_gcm(),
-            self.key.as_ref().expect("no key"),
+            self.key.as_ref().expect("failed to decrypt ECE chunk, missing crypto key"),
             Some(&nonce),
             &[],
             payload,
@@ -310,6 +309,7 @@ impl EceCrypt {
     /// # Panics
     ///
     /// Panics if the salt is not set.
+    #[inline(always)]
     fn create_header(&self) -> Vec<u8> {
         // Allocate the header
         let mut header = Vec::with_capacity(HEADER_LEN as usize);
@@ -341,6 +341,7 @@ impl EceCrypt {
     ///
     /// Panics if the given header bytes have an invalid size, or if the given header is not fully
     /// parsed.
+    #[inline(always)]
     fn parse_header(&mut self, header: &[u8]) {
         // Assert the header size
         assert_eq!(
@@ -374,6 +375,7 @@ impl EceCrypt {
     /// # Panics
     ///
     /// panics if either `self.salt` or `self.ikm` is not configured.
+    #[inline(always)]
     fn derive_key_and_nonce(&mut self) {
         self.key = Some(hkdf(
             self.salt.as_ref().map(|s| s.as_slice()),
@@ -393,6 +395,7 @@ impl EceCrypt {
     ///
     /// Each payload chunk uses a different nonce.
     /// This method generates the nonce to use.
+    #[inline(always)]
     fn generate_nonce(&self, seq: u32) -> Vec<u8> {
         // Get the base nonce which we need to modify
         let mut nonce = self.nonce.clone().expect("failed to generate nonce, no base nonce available");
@@ -415,6 +418,7 @@ impl EceCrypt {
     /// be obtained and parsed first.
     ///
     /// TODO: better docs
+    #[inline(always)]
     fn has_header(&self) -> bool {
         match self.mode {
             CryptMode::Encrypt => self.cur > 0,
@@ -426,6 +430,7 @@ impl EceCrypt {
     ///
     /// This checks whether all data for the last chunk, determined by the plaintext length in
     /// bytes, has entered this crypto pipe.
+    #[inline(always)]
     fn is_last(&self) -> bool {
         self.is_last_with(0)
     }
@@ -434,6 +439,7 @@ impl EceCrypt {
     ///
     /// This checks whether all data for the last chunk including `extra`, determined by the
     /// plaintext length in bytes, has entered this crypto pipe.
+    #[inline(always)]
     fn is_last_with(&self, extra: usize) -> bool {
         self.cur_in + extra >= self.len_in()
     }
@@ -446,6 +452,7 @@ impl EceCrypt {
     /// # Panics
     ///
     /// Panics if the sequence number exceeds the maximum.
+    #[inline(always)]
     fn increase_seq(&mut self) {
         self.seq = self.seq.checked_add(1)
             .expect("failed to crypt ECE payload, record sequence number exceeds limit");
