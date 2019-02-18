@@ -31,7 +31,7 @@ const TAG_LEN: usize = 16;
 /// The crypto nonce length.
 const NONCE_LEN: usize = 12;
 
-/// Thelength in bytes of the header.
+/// The length in bytes of the header.
 const HEADER_LEN: u32 = 21;
 
 /// The length in bytes of the crypto salt.
@@ -182,9 +182,15 @@ impl EceCrypt {
                 ciphertext.extend_from_slice(&chunk)
             }
 
+            // Increase chunk sequence number
+            self.increase_seq();
+
             (read, Some(ciphertext))
         } else {
             let (a, b) = self.encrypt_chunk(input);
+
+            // Increase chunk sequence number
+            self.increase_seq();
 
             dbg!(&self.cur_in);
             dbg!(self.len_out());
@@ -214,7 +220,12 @@ impl EceCrypt {
         }
 
         // Decrypt the chunk
-        self.decrypt_chunk(input)
+        let result = self.decrypt_chunk(input);
+
+        // Increase chunk sequence number
+        self.increase_seq();
+
+        result
     }
 
     /// Encrypt the given `plaintext` chunk data using this configured crypter.
@@ -331,10 +342,10 @@ impl EceCrypt {
     /// Panics if the given header bytes have an invalid size, or if the given header is not fully
     /// parsed.
     fn parse_header(&mut self, header: &[u8]) {
-        // Assert the minimum header chunk size
-        assert!(
-            header.len() as u32 >= HEADER_LEN,
-            "failed to decrypt, ECE header is too short",
+        // Assert the header size
+        assert_eq!(
+            header.len() as u32, HEADER_LEN,
+            "failed to decrypt, ECE header is not 21 bytes long",
         );
 
         // Easily handle header data as bytes
@@ -348,7 +359,7 @@ impl EceCrypt {
         let key_id_len = header.split_to(1)[0] as usize;
         let _length = key_id_len + KEY_LEN + 5;
 
-        // Derive the key and nonce
+        // Derive the key and nonce based on extracted salt
         self.derive_key_and_nonce();
 
         // Assert all header bytes have been consumed
@@ -385,6 +396,8 @@ impl EceCrypt {
     fn generate_nonce(&self, seq: u32) -> Vec<u8> {
         // Get the base nonce which we need to modify
         let mut nonce = self.nonce.clone().expect("failed to generate nonce, no base nonce available");
+
+        // TODO: slice `nonce` only once, use that for mutating
 
         let nonce_len = nonce.len();
         let m = BigEndian::read_u32(&nonce[nonce_len - 4..nonce_len]);
@@ -424,6 +437,19 @@ impl EceCrypt {
     fn is_last_with(&self, extra: usize) -> bool {
         self.cur_in + extra >= self.len_in()
     }
+
+    /// Increase the chunk sequence number.
+    ///
+    /// Called automatically by the `pipe_encrypt` and `pipe_decrypt` methods when a chunk is read.
+    /// This should never be invoked manually.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the sequence number exceeds the maximum.
+    fn increase_seq(&mut self) {
+        self.seq = self.seq.checked_add(1)
+            .expect("failed to crypt ECE payload, record sequence number exceeds limit");
+    }
 }
 
 impl Pipe for EceCrypt {
@@ -439,10 +465,6 @@ impl Pipe for EceCrypt {
             CryptMode::Encrypt => self.pipe_encrypt(input.to_vec()),
             CryptMode::Decrypt => self.pipe_decrypt(input),
         };
-
-        // Increase the sequence count
-        self.seq = self.seq.checked_add(1)
-            .expect("failed to crypt ECE payload, record sequence number exceeds limit");
 
         result
     }
