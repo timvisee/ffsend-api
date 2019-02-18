@@ -24,6 +24,17 @@ travis-ci = { repository = "timvisee/ffsend-api", branch = "master" }
 name = "ffsend_api"
 path = "src/lib.rs"
 
+[features]
+default = ["send1", "send2"]
+
+# Support for Firefox Send v1
+# TODO: implement feature throughout code
+send1 = []
+
+# Support for Firefox Send v2
+# TODO: implement feature throughout code
+send2 = ["websocket"]
+
 [dependencies]
 arrayref = "0.3"
 base64 = "0.10"
@@ -47,3 +58,4 @@ sha2 = "0.8"
 time = "0.1"
 url = "1.7"
 url_serde = "0.2"
+websocket = { version = "=0.22.2", optional = true }

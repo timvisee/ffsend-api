@@ -17,6 +17,8 @@ extern crate serde_json;
 extern crate time;
 pub extern crate url;
 pub extern crate url_serde;
+#[cfg(feature = "send2")]
+extern crate websocket;
 
 pub mod action;
 mod api;
