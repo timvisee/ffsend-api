@@ -19,6 +19,7 @@ pub enum Metadata {
         iv: String,
 
         /// The file mimetype.
+        /// TODO: can we use the `Mime` type here?
         #[serde(rename = "type")]
         mime: String,
     },
@@ -29,13 +30,15 @@ pub enum Metadata {
         name: String,
 
         /// The file mimetype.
+        /// TODO: can we use the `Mime` type here?
         #[serde(rename = "type")]
         mime: String,
 
         /// The file size.
         size: u64,
 
-        // TODO: include `manifest` field
+        /// The share manifest.
+        manifest: Manifest,
     },
 }
 
@@ -60,11 +63,12 @@ impl Metadata {
     /// * `name`: file name
     /// * `mime`: file mimetype
     /// * `size`: file size
-    pub fn from_send2(name: String, mime: &Mime, size: u64) -> Self {
+    pub fn from_send2(name: String, mime: String, size: u64) -> Self {
         Metadata::V2 {
-            name,
-            mime: mime.to_string(),
+            name: name.clone(),
+            mime: mime.clone(),
             size,
+            manifest: Manifest::from_file(name, mime, size),
         }
     }
 
@@ -77,7 +81,7 @@ impl Metadata {
     pub fn name(&self) -> &str {
         match self {
             Metadata::V1 { name, iv: _, mime: _ } => &name,
-            Metadata::V2 { name, mime: _, size: _ } => &name,
+            Metadata::V2 { name, mime: _, size: _, manifest: _ } => &name,
         }
     }
 
@@ -85,7 +89,7 @@ impl Metadata {
     pub fn mime(&self) -> &str {
         match self {
             Metadata::V1 { name: _, iv: _, mime } => &mime,
-            Metadata::V2 { name: _, mime, size: _ } => &mime,
+            Metadata::V2 { name: _, mime, size: _, manifest: _ } => &mime,
         }
     }
 
@@ -95,7 +99,7 @@ impl Metadata {
         // TODO: do not panic here
         let iv = match self {
             Metadata::V1 { name: _, iv, mime: _ } => iv,
-            Metadata::V2 { name: _, mime: _, size: _ } => panic!("no iv, send v2 data"),
+            Metadata::V2 { name: _, mime: _, size: _, manifest: _ } => panic!("no iv, send v2 data"),
         };
 
         // Decode the input vector
@@ -109,7 +113,7 @@ impl Metadata {
     pub fn size(&self) -> Option<u64> {
         match self {
             Metadata::V1 { name: _, iv: _, mime: _ } => None,
-            Metadata::V2 { name: _, mime: _, size } => Some(*size),
+            Metadata::V2 { name: _, mime: _, size, manifest: _ } => Some(*size),
         }
     }
 
@@ -119,5 +123,52 @@ impl Metadata {
      */
     pub fn is_archive(&self) -> bool {
         self.mime().to_lowercase() == MIME_TAR.to_lowercase()
+    }
+}
+
+/// Metadata manifest, used in Send v2.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Manifest {
+    /// Files part of a share.
+    files: Vec<ManifestFile>,
+}
+
+impl Manifest {
+    /// Construct a new manifest for the given list of files.
+    pub fn from(files: Vec<ManifestFile>) -> Self {
+        Self {
+            files,
+        }
+    }
+
+    /// Construct a manifest for a single file, with the given properties.
+    pub fn from_file(name: String, mime: String, size: u64) -> Self {
+        Self::from(vec![ManifestFile::from(name, mime, size)])
+    }
+}
+
+/// Metadata manifest file, used in Send v2.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ManifestFile {
+    /// The file name.
+    name: String,
+
+    /// The file mimetype.
+    /// TODO: can we use the `Mime` type here?
+    #[serde(rename = "type")]
+    mime: String,
+
+    /// The file size.
+    size: u64,
+}
+
+impl ManifestFile {
+    /// Construct a new manifest file.
+    pub fn from(name: String, mime: String, size: u64) -> Self {
+        ManifestFile {
+            name,
+            mime,
+            size,
+        }
     }
 }

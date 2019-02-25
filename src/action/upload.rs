@@ -229,7 +229,8 @@ impl Upload {
 
 
         // Construct the metadata
-        let metadata = Metadata::from_send2(name, file.mime(), file.size())
+        let mime = format!("{}", file.mime());
+        let metadata = Metadata::from_send2(name, mime, file.size())
             .to_json()
             .into_bytes();
 
