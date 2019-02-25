@@ -195,7 +195,7 @@ impl Upload {
         let name = self.name.clone().unwrap_or_else(|| file.name().to_owned());
 
         // Construct the metadata
-        let metadata = Metadata::from(key.iv(), name, &file.mime())
+        let metadata = Metadata::from_send1(key.iv(), name, &file.mime())
             .to_json()
             .into_bytes();
 

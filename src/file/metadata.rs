@@ -49,7 +49,7 @@ impl Metadata {
     /// * `iv`: initialisation vector
     /// * `name`: file name
     /// * `mime`: file mimetype
-    pub fn from(iv: &[u8], name: String, mime: &Mime) -> Self {
+    pub fn from_send1(iv: &[u8], name: String, mime: &Mime) -> Self {
         Metadata::V1 {
             iv: b64::encode(iv),
             name,
