@@ -74,7 +74,7 @@ impl<'a> Download<'a> {
             MetadataAction::new(self.file, self.password.clone(), self.check_exists)
                 .invoke(&client)?
         };
-        // TODO: what to do with this? Only set for Send v1?
+        // TODO: what to do with this? Only set for Send v2?
         // key.set_iv(metadata.metadata().iv());
 
         // Decide what actual file target to use
@@ -156,7 +156,7 @@ impl<'a> Download<'a> {
             .send()
             .map_err(|_| DownloadError::Request)?;
 
-        // Ensure the response is succesful
+        // Ensure the response is successful
         ensure_success(&response).map_err(DownloadError::Response)?;
 
         // Get the content length

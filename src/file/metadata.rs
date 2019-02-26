@@ -10,8 +10,8 @@ const MIME_TAR: &str = "application/x-tar";
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Metadata {
-    /// Metadata using in Send v1.
-    V1 {
+    /// Metadata using in Send v2.
+    V2 {
         /// The file name.
         name: String,
 
@@ -24,8 +24,8 @@ pub enum Metadata {
         mime: String,
     },
 
-    /// Metadata using in Send v2.
-    V2 {
+    /// Metadata using in Send v3.
+    V3 {
         /// The file name.
         name: String,
 
@@ -49,8 +49,8 @@ impl Metadata {
     /// * `iv`: initialisation vector
     /// * `name`: file name
     /// * `mime`: file mimetype
-    pub fn from_send1(iv: &[u8], name: String, mime: &Mime) -> Self {
-        Metadata::V1 {
+    pub fn from_send2(iv: &[u8], name: String, mime: &Mime) -> Self {
+        Metadata::V2 {
             iv: b64::encode(iv),
             name,
             mime: mime.to_string(),
@@ -63,8 +63,8 @@ impl Metadata {
     /// * `name`: file name
     /// * `mime`: file mimetype
     /// * `size`: file size
-    pub fn from_send2(name: String, mime: String, size: u64) -> Self {
-        Metadata::V2 {
+    pub fn from_send3(name: String, mime: String, size: u64) -> Self {
+        Metadata::V3 {
             name: name.clone(),
             mime: mime.clone(),
             size,
@@ -80,26 +80,26 @@ impl Metadata {
     /// Get the file name.
     pub fn name(&self) -> &str {
         match self {
-            Metadata::V1 { name, iv: _, mime: _ } => &name,
-            Metadata::V2 { name, mime: _, size: _, manifest: _ } => &name,
+            Metadata::V2 { name, iv: _, mime: _ } => &name,
+            Metadata::V3 { name, mime: _, size: _, manifest: _ } => &name,
         }
     }
 
     /// Get the file MIME type.
     pub fn mime(&self) -> &str {
         match self {
-            Metadata::V1 { name: _, iv: _, mime } => &mime,
-            Metadata::V2 { name: _, mime, size: _, manifest: _ } => &mime,
+            Metadata::V2 { name: _, iv: _, mime } => &mime,
+            Metadata::V3 { name: _, mime, size: _, manifest: _ } => &mime,
         }
     }
 
-    /// Get the input vector if set (`< Send v2`).
+    /// Get the input vector if set (`< Send v3`).
     // TODO: use an input vector length from a constant
     pub fn iv(&self) -> [u8; 12] {
         // TODO: do not panic here
         let iv = match self {
-            Metadata::V1 { name: _, iv, mime: _ } => iv,
-            Metadata::V2 { name: _, mime: _, size: _, manifest: _ } => panic!("no iv, send v2 data"),
+            Metadata::V2 { name: _, iv, mime: _ } => iv,
+            Metadata::V3 { name: _, mime: _, size: _, manifest: _ } => panic!("no iv, send v2 data"),
         };
 
         // Decode the input vector
@@ -109,11 +109,11 @@ impl Metadata {
         *array_ref!(decoded, 0, 12)
     }
 
-    /// Get the file size if set (`>= Send v2`).
+    /// Get the file size if set (`>= Send v3`).
     pub fn size(&self) -> Option<u64> {
         match self {
-            Metadata::V1 { name: _, iv: _, mime: _ } => None,
-            Metadata::V2 { name: _, mime: _, size, manifest: _ } => Some(*size),
+            Metadata::V2 { name: _, iv: _, mime: _ } => None,
+            Metadata::V3 { name: _, mime: _, size, manifest: _ } => Some(*size),
         }
     }
 
@@ -126,7 +126,7 @@ impl Metadata {
     }
 }
 
-/// Metadata manifest, used in Send v2.
+/// Metadata manifest, used in Send v3.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Manifest {
     /// Files part of a share.
@@ -147,7 +147,7 @@ impl Manifest {
     }
 }
 
-/// Metadata manifest file, used in Send v2.
+/// Metadata manifest file, used in Send v3.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ManifestFile {
     /// The file name.

@@ -6,7 +6,7 @@ use super::metadata::Metadata;
 
 /// File information, sent to the server before uploading.
 ///
-/// This is used for Firefox Send v2.
+/// This is used for Firefox Send v3.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FileInfo {
     /// The expirey time in seconds.

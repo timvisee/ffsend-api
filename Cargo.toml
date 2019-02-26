@@ -25,15 +25,15 @@ name = "ffsend_api"
 path = "src/lib.rs"
 
 [features]
-default = ["send1", "send2"]
-
-# Support for Firefox Send v1
-# TODO: implement feature throughout code
-send1 = []
+default = ["send2", "send3"]
 
 # Support for Firefox Send v2
 # TODO: implement feature throughout code
-send2 = ["websocket"]
+send2 = []
+
+# Support for Firefox Send v3
+# TODO: implement feature throughout code
+send3 = ["websocket"]
 
 [dependencies]
 arrayref = "0.3"

@@ -29,7 +29,7 @@ impl<'a> Exists<'a> {
         let exists_url = UrlBuilder::api_exists(self.file);
         let mut response = client.get(exists_url).send().map_err(|_| Error::Request)?;
 
-        // Ensure the status code is succesful, check the expiry state
+        // Ensure the status code is successful, check the expiry state
         match ensure_success(&response) {
             Ok(_) => {}
             Err(ResponseError::Expired) => return Ok(ExistsResponse::new(false, false)),
@@ -56,7 +56,7 @@ pub struct ExistsResponse {
     exists: bool,
 
     /// Whether this file requires a password.
-    // This field is named `password` in Send v1
+    // This field is named `password` in Send v2
     #[serde(rename = "requiresPassword", alias = "password")]
     requires_password: bool,
 }

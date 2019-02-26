@@ -1,4 +1,4 @@
-//! ECE AES-GCM 128 encrypter/decrypter pipe implementation for Firefox Send v2.
+//! ECE AES-GCM 128 encrypter/decrypter pipe implementation for Firefox Send v3.
 
 use std::io::{self, Read, Write};
 use std::cmp::min;
@@ -20,7 +20,7 @@ use super::{Crypt, CryptMode};
 
 /// The default record size in bytes to use for encryption.
 ///
-/// This value matches the default configured in the Firefox Send v2 source code.
+/// This value matches the default configured in the Firefox Send v3 source code.
 const RS: u32 = config::ECE_RECORD_SIZE;
 
 /// The crypto key length.
@@ -353,7 +353,7 @@ impl EceCrypt {
         self.salt = Some(header.split_to(SALT_LEN).to_vec());
         self.rs = BigEndian::read_u32(&header.split_to(RS_LEN));
 
-        // Extracted in Send v2 code, but doesn't seem to be used
+        // Extracted in Send v3 code, but doesn't seem to be used
         let key_id_len = header.split_to(1)[0] as usize;
         let _length = key_id_len + KEY_LEN + 5;
 
@@ -465,12 +465,10 @@ impl Pipe for EceCrypt {
         self.cur_in += input.len();
 
         // Use mode specific pipe function
-        let result = match self.mode {
+        match self.mode {
             CryptMode::Encrypt => self.pipe_encrypt(input.to_vec()),
             CryptMode::Decrypt => self.pipe_decrypt(input),
-        };
-
-        result
+        }
     }
 }
 

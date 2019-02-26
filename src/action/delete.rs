@@ -55,7 +55,7 @@ impl<'a> Delete<'a> {
             .send()
             .map_err(|_| DeleteError::Request)?;
 
-        // Ensure the status code is succesful
+        // Ensure the status code is successful
         ensure_success(&response).map_err(|err| err.into())
     }
 }

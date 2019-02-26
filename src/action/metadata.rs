@@ -122,8 +122,8 @@ impl<'a> Metadata<'a> {
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
 pub enum RawMetadataResponse {
-    /// Raw metadata using in Send v1.
-    V1 {
+    /// Raw metadata using in Send v2.
+    V2 {
         /// The encrypted metadata.
         #[serde(rename = "metadata")]
         meta: String,
@@ -133,8 +133,8 @@ pub enum RawMetadataResponse {
         size: u64,
     },
 
-    /// Raw metadata using in Send v2.
-    V2 {
+    /// Raw metadata using in Send v3.
+    V3 {
         /// The encrypted metadata.
         #[serde(rename = "metadata")]
         meta: String,
@@ -178,20 +178,20 @@ impl RawMetadataResponse {
     /// Get the encrypted metadata.
     fn meta(&self) -> &str {
         match self {
-            RawMetadataResponse::V1 { meta, size: _ } => &meta,
-            RawMetadataResponse::V2 { meta } => &meta,
+            RawMetadataResponse::V2 { meta, size: _ } => &meta,
+            RawMetadataResponse::V3 { meta } => &meta,
         }
     }
 
-    /// Get the file size in bytes, if provided by the server (`= send v1`).
+    /// Get the file size in bytes, if provided by the server (`= Send v2`).
     // TODO: use proper size
     // pub fn size(&self) -> Option<u64> {
     //     self.size
     // }
     pub fn size(&self) -> Option<u64> {
         match self {
-            RawMetadataResponse::V1 { meta: _, size } => Some(*size),
-            RawMetadataResponse::V2 { meta: _ } => None,
+            RawMetadataResponse::V2 { meta: _, size } => Some(*size),
+            RawMetadataResponse::V3 { meta: _ } => None,
         }
     }
 }
@@ -229,7 +229,7 @@ pub struct MetadataResponse {
     /// The actual metadata.
     metadata: MetadataData,
 
-    /// The file size in bytes, if provided by the server (`< send v2`).
+    /// The file size in bytes, if provided by the server (`< send v3`).
     size: Option<u64>,
 
     /// The metadata nonce.

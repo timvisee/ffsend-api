@@ -101,6 +101,7 @@ impl Upload {
 
         use websocket::{ClientBuilder, Message, OwnedMessage};
 
+        // TODO: define endpoint in constant
         let ws_url = self.host.join("api/ws").expect("invalid host");
 
         let mut ws_client = ClientBuilder::new(ws_url.as_str())
@@ -195,7 +196,7 @@ impl Upload {
         let name = self.name.clone().unwrap_or_else(|| file.name().to_owned());
 
         // Construct the metadata
-        let metadata = Metadata::from_send1(key.iv(), name, &file.mime())
+        let metadata = Metadata::from_send2(key.iv(), name, &file.mime())
             .to_json()
             .into_bytes();
 
@@ -219,7 +220,7 @@ impl Upload {
         Ok(metadata)
     }
 
-    /// Create file info to send to the server, used for Firefox Send v2.
+    /// Create file info to send to the server, used for Firefox Send v3.
     #[cfg(feature = "send2")]
     fn create_file_info(&self, key: &KeySet, file: &FileData) -> Result<String, MetaError> {
         // Determine what filename to use, build the metadata
@@ -230,7 +231,7 @@ impl Upload {
 
         // Construct the metadata
         let mime = format!("{}", file.mime());
-        let metadata = Metadata::from_send2(name, mime, file.size())
+        let metadata = Metadata::from_send3(name, mime, file.size())
             .to_json()
             .into_bytes();
 
@@ -323,6 +324,7 @@ impl Upload {
         let form = Form::new().part("data", part);
 
         // Define the URL to call
+        // TODO: define endpoint in constant
         // TODO: create an error for this unwrap
         let url = self.host.join("api/upload").expect("invalid host");
 
@@ -391,7 +393,7 @@ struct UploadResponse {
 
     /// The owner key, used to do further file modifications.
     ///
-    /// Called `owner` in Firefox Send v1, and `ownerToken` in Firefox Send v2.
+    /// Called `owner` in Firefox Send v2, and `ownerToken` in Firefox Send v3.
     #[serde(alias = "ownerToken", alias = "owner")]
     owner_token: String,
 }

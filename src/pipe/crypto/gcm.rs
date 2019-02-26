@@ -1,4 +1,4 @@
-//! AES-GCM 128 encrypter/decrypter pipe implementation for Firefox Send v1.
+//! AES-GCM 128 encrypter/decrypter pipe implementation for Firefox Send v2.
 
 use std::cmp::min;
 use std::io::{self, Read, Write};

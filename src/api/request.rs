@@ -8,7 +8,7 @@ pub fn ensure_success(response: &Response) -> Result<(), ResponseError> {
     // Get the status
     let status = response.status();
 
-    // Stop if succesful
+    // Stop if successful
     if status.is_success() {
         return Ok(());
     }
