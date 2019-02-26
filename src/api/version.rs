@@ -2,7 +2,7 @@ use std::fmt;
 
 use version_compare::{CompOp, VersionCompare};
 
-/// Firefox Send version selector.
+/// Firefox Send API version selector.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Version {
     /// Firefox Send v2.
@@ -21,12 +21,23 @@ impl Version {
     /// (or not compiled due to a missing compiler feature) API version an
     /// `Err` is returning holding the version string.
     pub fn parse<'a>(ver: &'a str) -> Result<Self, &'a str> {
+        // Trim, and strip any prefixed v
+        let mut stripped = ver.trim();
+        if stripped.starts_with('v') {
+            stripped = &stripped[1..];
+        }
+
+        // Error on empty string
+        if stripped.is_empty() {
+            return Err(ver);
+        }
+
         // Is this using version 2
         #[cfg(feature = "send2")]
         {
             // Test the lower and upper version bounds
-            let lower = VersionCompare::compare_to(ver, "2.0", &CompOp::Ge).map_err(|_| ver)?;
-            let upper = VersionCompare::compare_to(ver, "3.0", &CompOp::Lt).map_err(|_| ver)?;
+            let lower = VersionCompare::compare_to(stripped, "2.0", &CompOp::Ge).map_err(|_| ver)?;
+            let upper = VersionCompare::compare_to(stripped, "3.0", &CompOp::Lt).map_err(|_| ver)?;
             if lower && upper {
                 return Ok(Version::V2);
             }
@@ -36,8 +47,8 @@ impl Version {
         #[cfg(feature = "send3")]
         {
             // Test the lower and upper version bounds
-            let lower = VersionCompare::compare_to(ver, "3.0", &CompOp::Ge).map_err(|_| ver)?;
-            let upper = VersionCompare::compare_to(ver, "4.0", &CompOp::Lt).map_err(|_| ver)?;
+            let lower = VersionCompare::compare_to(stripped, "3.0", &CompOp::Ge).map_err(|_| ver)?;
+            let upper = VersionCompare::compare_to(stripped, "4.0", &CompOp::Lt).map_err(|_| ver)?;
             if lower && upper {
                 return Ok(Version::V3);
             }

@@ -39,13 +39,7 @@ impl Version {
 
         // Probe some server URLs to determine the API version if still unknown
         if let Err(Error::Unknown) = result {
-            // TODO: remove after debugging!
-            eprintln!("### probing server for URLs to determine version!");
-
             result = self.probe(client);
-
-            // TODO: remove after debugging!
-            eprintln!("### probe result: {:?}", result);
         }
 
         result
@@ -89,19 +83,19 @@ impl Version {
     ///
     /// This method panics if the host was invalid.
     fn probe(&self, client: &Client) -> Result<api::Version, Error> {
-        // Probe Firefox Send v2
-        #[cfg(feature = "send2")]
-        {
-            if self.exists(client, V2_PROBE_ENDPOINT) {
-                return Ok(api::Version::V2);
-            }
-        }
-
         // Probe Firefox Send v3
         #[cfg(feature = "send3")]
         {
             if self.exists(client, V3_PROBE_ENDPOINT) {
                 return Ok(api::Version::V3);
+            }
+        }
+
+        // Probe Firefox Send v2
+        #[cfg(feature = "send2")]
+        {
+            if self.exists(client, V2_PROBE_ENDPOINT) {
+                return Ok(api::Version::V2);
             }
         }
 
