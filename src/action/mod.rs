@@ -6,3 +6,4 @@ pub mod metadata;
 pub mod params;
 pub mod password;
 pub mod upload;
+pub mod version;
