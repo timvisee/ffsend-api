@@ -67,7 +67,7 @@ impl Version {
         // Ensure the status code is successful
         match ensure_success(&response) {
             Ok(_) => {}
-            Err(err) => return Err(Error::Unknown),
+            Err(_) => return Err(Error::Unknown),
         }
 
         // Parse the response and attempt to determine the version number

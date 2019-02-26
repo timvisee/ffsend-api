@@ -1,3 +1,5 @@
+use std::fmt;
+
 use version_compare::{CompOp, VersionCompare};
 
 /// Firefox Send version selector.
@@ -42,5 +44,17 @@ impl Version {
         }
 
         Err(ver)
+    }
+}
+
+impl fmt::Display for Version {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            #[cfg(feature = "send2")]
+            Version::V2 => write!(f, "2"),
+
+            #[cfg(feature = "send3")]
+            Version::V3 => write!(f, "3"),
+        }
     }
 }
