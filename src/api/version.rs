@@ -69,3 +69,19 @@ impl fmt::Display for Version {
         }
     }
 }
+
+/// A desired version to use for communicating with a Send server.
+///
+/// Various options are available, to use an exact version, or to look it up at runtime.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum DesiredVersion {
+    /// Use just the given API version when communicating with a Send server.
+    Use(Version),
+
+    /// Assume the given API version when communicating with a Send version, but attempt to look up
+    /// the correct version if communication fails.
+    Assume(Version),
+
+    /// Attempt to look up the server API version at runtime.
+    Lookup,
+}

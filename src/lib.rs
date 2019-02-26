@@ -22,7 +22,7 @@ extern crate version_compare;
 extern crate websocket;
 
 pub mod action;
-mod api;
+pub mod api;
 pub mod config;
 pub mod crypto;
 mod ext;

@@ -5,4 +5,4 @@ pub mod url;
 mod version;
 
 // Re-export
-pub use version::Version;
+pub use version::{DesiredVersion, Version};
