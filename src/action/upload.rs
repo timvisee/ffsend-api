@@ -330,7 +330,7 @@ impl Upload {
             .expect("failed to set up websocket builder")
             .add_protocol(WEBSOCKET_PROTOCOL)
             .connect(None)
-            .map_err(|_| Error::Upload(UploadError::Request))?;
+            .map_err(|e| { eprintln!("{:?}", e); Error::Upload(UploadError::Request) })?;
 
         // Create file info to sent when uploading
         let file_info = self.create_file_info(&key, file_data).map_err(|e| -> Error { e.into() })?;
@@ -697,15 +697,4 @@ impl From<UrlParseError> for UploadError {
     fn from(err: UrlParseError) -> UploadError {
         UploadError::ParseUrl(err)
     }
-}
-
-/// Check whether the given URL is secure, based on a known scheme list.
-pub fn is_secure_url(url: &Url) -> bool {
-    is_secure_scheme(url.scheme())
-}
-
-/// Check whether the given scheme is secure, based on a known list.
-pub fn is_secure_scheme(scheme: &str) -> bool {
-    let scheme = scheme.trim().to_lowercase();
-    &scheme == "https" || &scheme == "wss"
 }
