@@ -42,7 +42,7 @@ const DEFAULT_BUF_SIZE: usize = 8 * 1024;
 ///
 /// It is recommended to expose a custom reader type definition for each of your pipes like this:
 ///
-/// ```
+/// ```ignore
 /// pub type MyReader = PipeReader<MyPipe>;
 /// ```
 pub struct PipeReader<P>
@@ -60,7 +60,7 @@ pub struct PipeReader<P>
 ///
 /// It is recommended to expose a custom writer type definition for each of your pipes like this:
 ///
-/// ```
+/// ```ignore
 /// pub type MyWriter = PipeWriter<MyPipe>;
 /// ```
 pub struct PipeWriter<P>
