@@ -330,7 +330,7 @@ impl Upload {
             .expect("failed to set up websocket builder")
             .add_protocol(WEBSOCKET_PROTOCOL)
             .connect(None)
-            .map_err(|e| { eprintln!("{:?}", e); Error::Upload(UploadError::Request) })?;
+            .map_err(|_| Error::Upload(UploadError::Request))?;
 
         // Create file info to sent when uploading
         let file_info = self.create_file_info(&key, file_data).map_err(|e| -> Error { e.into() })?;
