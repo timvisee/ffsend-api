@@ -1,4 +1,4 @@
-use reqwest::{Client, StatusCode};
+use reqwest::Client;
 use url::Url;
 
 use crate::api;

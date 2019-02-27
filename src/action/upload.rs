@@ -378,7 +378,7 @@ impl Upload {
             OwnedMessage::Text(status) => Some(status),
             _ => None,
         };
-        let ok = status.map(|s| serde_json::from_str::<UploadStatusResponse>(&s))
+        let ok = status.and_then(|s| serde_json::from_str::<UploadStatusResponse>(&s).ok())
             .map(|s| s.is_ok())
             .unwrap_or(false);
         if !ok {

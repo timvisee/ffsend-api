@@ -2,7 +2,6 @@ use serde_json;
 
 use crate::config;
 use crate::crypto::key_set::KeySet;
-use super::metadata::Metadata;
 
 /// File information, sent to the server before uploading.
 ///
