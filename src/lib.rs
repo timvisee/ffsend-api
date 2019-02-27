@@ -27,6 +27,7 @@ pub mod config;
 pub mod crypto;
 mod ext;
 pub mod file;
+#[cfg(feature = "send3")]
 mod io;
 pub mod pipe;
 

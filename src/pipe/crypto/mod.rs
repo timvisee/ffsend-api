@@ -2,12 +2,16 @@
 
 use openssl::symm::Mode as OpenSslMode;
 
+#[cfg(feature = "send3")]
 pub mod ece;
+#[cfg(feature = "send2")]
 pub mod gcm;
 mod traits;
 
 // Re-export modules
+#[cfg(feature = "send3")]
 pub use self::ece::{EceCrypt, EceReader, EceWriter};
+#[cfg(feature = "send2")]
 pub use gcm::{GcmCrypt, GcmReader, GcmWriter};
 pub use traits::Crypt;
 

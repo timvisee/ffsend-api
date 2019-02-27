@@ -2,16 +2,23 @@ extern crate mime;
 
 use std::fs::File;
 use std::io::{self, Error as IoError, Read};
+#[cfg(feature = "send3")]
 use std::mem;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
+#[cfg(feature = "send2")]
 use self::mime::APPLICATION_OCTET_STREAM;
 use mime_guess::{guess_mime_type, Mime};
 use openssl::symm::encrypt_aead;
+#[cfg(feature = "send2")]
 use reqwest::header::AUTHORIZATION;
+#[cfg(feature = "send2")]
 use reqwest::multipart::{Form, Part};
-use reqwest::{Client, Error as ReqwestError, Request};
+use reqwest::{Client, Error as ReqwestError};
+#[cfg(feature = "send2")]
+use reqwest::Request;
+#[cfg(feature = "send3")]
 use serde_json;
 use url::{ParseError as UrlParseError, Url};
 #[cfg(feature = "send3")]
@@ -19,24 +26,31 @@ use websocket::{ClientBuilder, OwnedMessage, result::WebSocketError};
 
 use super::params::{Error as ParamsError, Params, ParamsData};
 use super::password::{Error as PasswordError, Password};
+#[cfg(feature = "send2")]
 use crate::api::nonce::header_nonce;
-use crate::api::request::{ensure_success, ResponseError};
+#[cfg(feature = "send2")]
+use crate::api::request::ensure_success;
+use crate::api::request::ResponseError;
 use crate::api::Version;
 use crate::crypto::b64;
 use crate::crypto::key_set::KeySet;
-use crate::file::{
-    info::FileInfo,
-    metadata::Metadata,
-};
+#[cfg(feature = "send3")]
+use crate::file::info::FileInfo;
+use crate::file::metadata::Metadata;
 use crate::file::remote_file::RemoteFile;
+#[cfg(feature = "send3")]
 use crate::io::ChunkRead;
+#[cfg(feature = "send3")]
+use crate::pipe::crypto::{ece, EceCrypt};
+#[cfg(feature = "send2")]
+use crate::pipe::crypto::GcmCrypt;
 use crate::pipe::{
-    crypto::{ece, EceCrypt, GcmCrypt},
     progress::{ProgressPipe, ProgressReporter},
     prelude::*,
 };
 
 /// The protocol to report to the server when uploading through a websocket.
+#[cfg(feature = "send3")]
 const WEBSOCKET_PROTOCOL: &str = "ffsend";
 
 /// A file upload action to a Send server.
@@ -94,8 +108,7 @@ impl Upload {
         let file = FileData::from(&self.path)?;
         let key = KeySet::generate(true);
 
-        // Create metadata and a file reader
-        let metadata = self.create_metadata(&key, &file)?;
+        // Create the file reader
         let reader = self.create_reader(&key, reporter.cloned())?;
         let reader_len = reader.len_in() as u64;
 
@@ -109,7 +122,9 @@ impl Upload {
 
         // Execute the request
         let (result, nonce) = match self.version {
-            Version::V2 => self.upload_send2(client, &key, &metadata, reader)?,
+            #[cfg(feature = "send2")]
+            Version::V2 => self.upload_send2(client, &key, &file, reader)?,
+            #[cfg(feature = "send3")]
             Version::V3 => self.upload_send3(&key, &file, reader)?,
         };
 
@@ -238,14 +253,17 @@ impl Upload {
         &self,
         client: &Client,
         key: &KeySet,
-        metadata: &[u8],
+        file: &FileData,
         reader: Reader,
-    ) -> Result<(RemoteFile, Option<Vec<u8>>), UploadError> {
-        // create the request to send
+    ) -> Result<(RemoteFile, Option<Vec<u8>>), Error> {
+        // Create metadata
+        let metadata = self.create_metadata(&key, file)?;
+
+        // Create the request to send
         let req = self.create_request_send2(client, &key, &metadata, reader)?;
 
         // Execute the request
-        self.execute_request_send2(req, client, &key)
+        self.execute_request_send2(req, client, &key).map_err(|e| e.into())
     }
 
     /// Build the request that will be send to the server, used in Firefox Send v2.
@@ -444,6 +462,7 @@ struct UploadStatusResponse {
     ok: bool,
 }
 
+#[cfg(feature = "send3")]
 impl UploadStatusResponse {
     /// Check if OK.
     pub fn is_ok(&self) -> bool {
@@ -461,6 +480,7 @@ struct FileData<'a> {
     mime: Mime,
 
     /// The file size.
+    #[allow(unused)]
     size: u64,
 }
 
@@ -499,6 +519,7 @@ impl<'a> FileData<'a> {
     }
 
     /// Get the file size in bytes.
+    #[cfg(feature = "send3")]
     pub fn size(&self) -> u64 {
         self.size
     }
@@ -660,6 +681,7 @@ pub enum UploadError {
     /// An error occurred while streaming the encrypted file (including file info, header and
     /// footer) for uploading over a websocket.
     #[fail(display = "failed to stream file for upload over websocket")]
+    #[cfg(feature = "send3")]
     UploadStream(#[cause] WebSocketError),
 
     /// The server responded with data that was not understood, or did not respond at all while a
@@ -681,6 +703,7 @@ pub enum UploadError {
     ParseUrl(#[cause] UrlParseError),
 }
 
+#[cfg(feature = "send3")]
 impl From<WebSocketError> for UploadError {
     fn from(err: WebSocketError) -> UploadError {
         UploadError::UploadStream(err)

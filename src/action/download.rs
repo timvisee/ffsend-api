@@ -13,8 +13,11 @@ use crate::api::Version;
 use crate::crypto::key_set::KeySet;
 use crate::crypto::sig::signature_encoded;
 use crate::file::remote_file::RemoteFile;
+#[cfg(feature = "send3")]
+use crate::pipe::crypto::EceCrypt;
+#[cfg(feature = "send2")]
+use crate::pipe::crypto::GcmCrypt;
 use crate::pipe::{
-    crypto::{EceCrypt, GcmCrypt},
     progress::{ProgressPipe, ProgressReporter},
     prelude::*,
 };
@@ -191,11 +194,13 @@ impl<'a> Download<'a> {
     ) -> Result<impl Write, FileError> {
         // Build the decrypting file writer for the selected server API version
         let writer: Box<dyn Write> = match self.version {
+            #[cfg(feature = "send2")]
             Version::V2 => {
                 let decrypt = GcmCrypt::decrypt(len as usize, key.file_key().unwrap(), key.iv());
                 let writer = decrypt.writer(Box::new(file));
                 Box::new(writer)
             }
+            #[cfg(feature = "send3")]
             Version::V3 => {
                 let ikm = key.secret().to_vec();
                 let decrypt = EceCrypt::decrypt(len as usize, ikm);
