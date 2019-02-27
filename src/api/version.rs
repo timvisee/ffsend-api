@@ -85,3 +85,16 @@ pub enum DesiredVersion {
     /// Attempt to look up the server API version at runtime.
     Lookup,
 }
+
+impl DesiredVersion {
+    /// Get the selected API version, if set.
+    ///
+    /// This returns `None` if it is the `Lookup` variant.
+    pub fn version(self) -> Option<Version> {
+        match self {
+            DesiredVersion::Use(v) => Some(v),
+            DesiredVersion::Assume(v) => Some(v),
+            DesiredVersion::Lookup => None,
+        }
+    }
+}

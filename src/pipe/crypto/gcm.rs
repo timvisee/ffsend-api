@@ -365,6 +365,8 @@ impl PipeLen for GcmReader {
     }
 }
 
+impl ReadLen for GcmReader {}
+
 impl PipeLen for GcmWriter {
     fn len_in(&self) -> usize {
         self.crypt.len_in()
@@ -374,6 +376,8 @@ impl PipeLen for GcmWriter {
         self.crypt.len_out()
     }
 }
+
+impl WriteLen for GcmWriter {}
 
 unsafe impl Send for GcmReader {}
 unsafe impl Send for GcmWriter {}

@@ -80,6 +80,9 @@ pub trait PipeLen {
     fn len_out(&self) -> usize;
 }
 
+pub trait ReadLen: Read + PipeLen + Send {}
+pub trait WriteLen: Write + PipeLen + Send {}
+
 // TODO: use automatic implementation for crypt reader and writer wrapping crypt having pipelen
 // impl<R, C> PipeLen for R
 //     where R: CryptRead<C>,

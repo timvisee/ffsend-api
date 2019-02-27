@@ -17,7 +17,7 @@ mod traits;
 
 // Re-export modules
 pub use progress::{ProgressPipe, ProgressReader, ProgressWriter, ProgressReporter};
-pub use traits::{Pipe, PipeRead, PipeWrite, PipeLen};
+pub use traits::{Pipe, PipeRead, PipeWrite, PipeLen, ReadLen, WriteLen};
 
 /// Prelude for common pipe traits.
 pub mod prelude {
@@ -27,6 +27,8 @@ pub mod prelude {
         PipeRead,
         PipeWrite,
         PipeLen,
+        ReadLen,
+        WriteLen,
     };
 }
 

@@ -1,7 +1,7 @@
 extern crate mime;
 
 use std::fs::File;
-use std::io::{self, BufReader, Error as IoError, Read};
+use std::io::{self, Error as IoError, Read};
 use std::mem;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -14,11 +14,14 @@ use reqwest::multipart::{Form, Part};
 use reqwest::{Client, Error as ReqwestError, Request};
 use serde_json;
 use url::{ParseError as UrlParseError, Url};
+#[cfg(feature = "send3")]
+use websocket::{ClientBuilder, OwnedMessage};
 
 use super::params::{Error as ParamsError, Params, ParamsData};
 use super::password::{Error as PasswordError, Password};
 use crate::api::nonce::header_nonce;
 use crate::api::request::{ensure_success, ResponseError};
+use crate::api::Version;
 use crate::crypto::b64;
 use crate::crypto::key_set::KeySet;
 use crate::file::{
@@ -26,7 +29,7 @@ use crate::file::{
     metadata::Metadata,
 };
 use crate::file::remote_file::RemoteFile;
-use crate::io::{Chunks, ChunkRead};
+use crate::io::ChunkRead;
 use crate::pipe::{
     crypto::{EceCrypt, GcmCrypt},
     progress::{ProgressPipe, ProgressReporter},
@@ -35,6 +38,9 @@ use crate::pipe::{
 
 /// A file upload action to a Send server.
 pub struct Upload {
+    /// The server API version to use.
+    version: Version,
+
     /// The Send host to upload the file to.
     host: Url,
 
@@ -56,6 +62,7 @@ pub struct Upload {
 impl Upload {
     /// Construct a new upload action.
     pub fn new(
+        version: Version,
         host: Url,
         path: PathBuf,
         name: Option<String>,
@@ -63,6 +70,7 @@ impl Upload {
         params: Option<ParamsData>,
     ) -> Self {
         Self {
+            version,
             host,
             path,
             name,
@@ -83,11 +91,8 @@ impl Upload {
 
         // Create metadata and a file reader
         let metadata = self.create_metadata(&key, &file)?;
-        let mut reader = self.create_reader(&key, reporter.cloned())?;
+        let reader = self.create_reader(&key, reporter.cloned())?;
         let reader_len = reader.len_in() as u64;
-
-        // // create the request to send
-        // let req = self.create_request(client, &key, &metadata, reader);
 
         // Start the reporter
         if let Some(reporter) = reporter {
@@ -97,10 +102,233 @@ impl Upload {
                 .start(reader_len);
         }
 
+        // Execute the request
+        let (result, nonce) = match self.version {
+            Version::V2 => self.upload_v2(client, &key, &metadata, reader)?,
+            Version::V3 => self.upload_v3(client, &key, &file, &metadata, reader)?,
+        };
+
+        // Mark the reporter as finished
+        if let Some(reporter) = reporter {
+            reporter.lock().map_err(|_| UploadError::Progress)?.finish();
+        }
+
+        // Change the password if set
+        if let Some(password) = self.password {
+            Password::new(&result, &password, nonce.clone()).invoke(client)?;
+        }
+
+        // Change parameters if set
+        if let Some(params) = self.params {
+            Params::new(&result, params, nonce.clone()).invoke(client)?;
+        }
+
+        Ok(result)
+    }
+
+    /// Create a blob of encrypted metadata, used in Firefox Send v2.
+    #[cfg(feature = "send2")]
+    fn create_metadata(&self, key: &KeySet, file: &FileData) -> Result<Vec<u8>, MetaError> {
+        // Determine what filename to use
+        let name = self.name.clone().unwrap_or_else(|| file.name().to_owned());
+
+        // Construct the metadata
+        let metadata = Metadata::from_send2(key.iv(), name, &file.mime())
+            .to_json()
+            .into_bytes();
+
+        // Encrypt the metadata
+        let mut metadata_tag = vec![0u8; 16];
+        let mut metadata = match encrypt_aead(
+            KeySet::cipher(),
+            key.meta_key().unwrap(),
+            Some(&[0u8; 12]),
+            &[],
+            &metadata,
+            &mut metadata_tag,
+        ) {
+            Ok(metadata) => metadata,
+            Err(_) => return Err(MetaError::Encrypt),
+        };
+
+        // Append the encryption tag
+        metadata.append(&mut metadata_tag);
+
+        Ok(metadata)
+    }
+
+    /// Create file info to send to the server, used for Firefox Send v3.
+    #[cfg(feature = "send3")]
+    fn create_file_info(&self, key: &KeySet, file: &FileData) -> Result<String, MetaError> {
+        // Determine what filename to use, build the metadata
+        let name = self.name.clone().unwrap_or_else(|| file.name().to_owned());
+        //let metadata = Metadata::from_send2(name, file.mime(), file.size());
 
 
-        use websocket::{ClientBuilder, Message, OwnedMessage};
 
+        // Construct the metadata
+        let mime = format!("{}", file.mime());
+        let metadata = Metadata::from_send3(name, mime, file.size())
+            .to_json()
+            .into_bytes();
+
+        // Encrypt the metadata
+        let mut metadata_tag = vec![0u8; 16];
+        let mut metadata = match encrypt_aead(
+            KeySet::cipher(),
+            key.meta_key().unwrap(),
+            Some(&[0u8; 12]),
+            &[],
+            &metadata,
+            &mut metadata_tag,
+        ) {
+            Ok(metadata) => metadata,
+            Err(_) => return Err(MetaError::Encrypt),
+        };
+
+        // Append the encryption tag
+        metadata.append(&mut metadata_tag);
+
+
+
+        // TODO: use proper expire and download count configuration here
+        let info = FileInfo::from(None, Some(1), b64::encode(&metadata), key);
+
+        Ok(info.to_json())
+    }
+
+    /// Create a reader that reads the file as encrypted stream.
+    // TODO: handle errors!
+    fn create_reader(
+        &self,
+        key: &KeySet,
+        reporter: Option<Arc<Mutex<ProgressReporter>>>,
+    ) -> Result<Reader, Error> {
+        // Open the file
+        let file = match File::open(self.path.as_path()) {
+            Ok(file) => file,
+            Err(err) => return Err(FileError::Open(err).into()),
+        };
+
+        // Get the file length
+        let len = file.metadata().expect("failed to fetch file metadata").len();
+
+        // Build the progress pipe file reader
+        let progress = ProgressPipe::zero(len, reporter);
+        let reader = progress.reader(Box::new(file));
+
+        // Build the encrypting file rader
+        match self.version {
+            Version::V2 => {
+                let encrypt = GcmCrypt::encrypt(len as usize, key.file_key().unwrap(), key.iv());
+                let reader = encrypt.reader(Box::new(reader));
+                Ok(Reader::new(Box::new(reader)))
+            }
+            Version::V3 => {
+                let ikm = key.secret().to_vec();
+                let encrypt = EceCrypt::encrypt(len as usize, ikm, None);
+                let reader = encrypt.reader(Box::new(reader));
+                Ok(Reader::new(Box::new(reader)))
+            }
+        }
+    }
+
+    /// Upload the file to the server, used in Firefox Send v2.
+    #[cfg(feature = "send2")]
+    fn upload_v2(
+        &self,
+        client: &Client,
+        key: &KeySet,
+        metadata: &[u8],
+        reader: Reader,
+    ) -> Result<(RemoteFile, Option<Vec<u8>>), UploadError> {
+        // create the request to send
+        let req = self.create_request_v2(client, &key, &metadata, reader);
+
+        // Execute the request
+        self.execute_request_v2(req, client, &key)
+    }
+
+    /// Build the request that will be send to the server, used in Firefox Send v2.
+    #[cfg(feature = "send2")]
+    fn create_request_v2(
+        &self,
+        client: &Client,
+        key: &KeySet,
+        metadata: &[u8],
+        reader: Reader,
+    ) -> Request {
+        // Get the reader output length
+        let len = reader.len_out() as u64;
+
+        // Configure a form to send
+        let part = Part::reader_with_length(reader, len)
+            .mime_str(APPLICATION_OCTET_STREAM.as_ref())
+            .expect("failed to set request mime");
+        let form = Form::new().part("data", part);
+
+        // Define the URL to call
+        // TODO: define endpoint in constant
+        // TODO: create an error for this unwrap
+        let url = self.host.join("api/upload").expect("invalid host");
+
+        // Build the request
+        // TODO: create an error for this unwrap
+        client
+            .post(url.as_str())
+            .header(
+                AUTHORIZATION.as_str(),
+                format!("send-v1 {}", key.auth_key_encoded().unwrap()),
+            )
+            .header("X-File-Metadata", b64::encode(&metadata))
+            .multipart(form)
+            .build()
+            .expect("failed to build an API request")
+    }
+
+    /// Execute the given request, and create a file object that represents the
+    /// uploaded file, used in Firefox Send v2.
+    #[cfg(feature = "send2")]
+    fn execute_request_v2(
+        &self,
+        req: Request,
+        client: &Client,
+        key: &KeySet,
+    ) -> Result<(RemoteFile, Option<Vec<u8>>), UploadError> {
+        // Execute the request
+        let mut response = match client.execute(req) {
+            Ok(response) => response,
+            // TODO: attach the error context
+            Err(_) => return Err(UploadError::Request),
+        };
+
+        // Ensure the response is successful
+        ensure_success(&response).map_err(UploadError::Response)?;
+
+        // Try to get the nonce, don't error on failure
+        let nonce = header_nonce(&response).ok();
+
+        // Decode the response
+        let response: UploadResponse = match response.json() {
+            Ok(response) => response,
+            Err(err) => return Err(UploadError::Decode(err)),
+        };
+
+        // Transform the responce into a file object
+        Ok((response.into_file(self.host.clone(), &key)?, nonce))
+    }
+    /// Upload the file to the server, used in Firefox Send v3.
+    // TODO: handle errors
+    // TODO: resolve all inner TODOs
+    #[cfg(feature = "send3")]
+    fn upload_v3(
+        &self,
+        client: &Client,
+        key: &KeySet,
+        file_data: &FileData,
+        metadata: &[u8],
+        mut reader: Reader,
+    ) -> Result<(RemoteFile, Option<Vec<u8>>), UploadError> {
         // TODO: define endpoint in constant
         let ws_url = self.host.join("api/ws").expect("invalid host");
 
@@ -111,7 +339,8 @@ impl Upload {
             .connect_insecure()
             .expect("failed to build websocket client");
 
-        let file_info = self.create_file_info(&key, &file).expect("failed to create file info for upload");
+        // Create file info to sent when uploading
+        let file_info = self.create_file_info(&key, file_data).expect("failed to create file info for upload");
         let ws_metadata = OwnedMessage::Text(file_info);
         ws_client.send_message(&ws_metadata).expect("failed to send metadata message");
 
@@ -165,212 +394,9 @@ impl Upload {
 
         let remote_file = upload_response.into_file(self.host.clone(), &key)
             .expect("failed to build remote file");
-        return Ok(remote_file);
 
-
-
-        // // Execute the request
-        // let (result, nonce) = self.execute_request(req, client, &key)?;
-
-        // // Mark the reporter as finished
-        // if let Some(reporter) = reporter {
-        //     reporter.lock().map_err(|_| UploadError::Progress)?.finish();
-        // }
-
-        // // Change the password if set
-        // if let Some(password) = self.password {
-        //     Password::new(&result, &password, nonce.clone()).invoke(client)?;
-        // }
-
-        // // Change parameters if set
-        // if let Some(params) = self.params {
-        //     Params::new(&result, params, nonce.clone()).invoke(client)?;
-        // }
-
-        // Ok(result)
-    }
-
-    /// Create a blob of encrypted metadata.
-    fn create_metadata(&self, key: &KeySet, file: &FileData) -> Result<Vec<u8>, MetaError> {
-        // Determine what filename to use
-        let name = self.name.clone().unwrap_or_else(|| file.name().to_owned());
-
-        // Construct the metadata
-        let metadata = Metadata::from_send2(key.iv(), name, &file.mime())
-            .to_json()
-            .into_bytes();
-
-        // Encrypt the metadata
-        let mut metadata_tag = vec![0u8; 16];
-        let mut metadata = match encrypt_aead(
-            KeySet::cipher(),
-            key.meta_key().unwrap(),
-            Some(&[0u8; 12]),
-            &[],
-            &metadata,
-            &mut metadata_tag,
-        ) {
-            Ok(metadata) => metadata,
-            Err(_) => return Err(MetaError::Encrypt),
-        };
-
-        // Append the encryption tag
-        metadata.append(&mut metadata_tag);
-
-        Ok(metadata)
-    }
-
-    /// Create file info to send to the server, used for Firefox Send v3.
-    #[cfg(feature = "send2")]
-    fn create_file_info(&self, key: &KeySet, file: &FileData) -> Result<String, MetaError> {
-        // Determine what filename to use, build the metadata
-        let name = self.name.clone().unwrap_or_else(|| file.name().to_owned());
-        //let metadata = Metadata::from_send2(name, file.mime(), file.size());
-
-
-
-        // Construct the metadata
-        let mime = format!("{}", file.mime());
-        let metadata = Metadata::from_send3(name, mime, file.size())
-            .to_json()
-            .into_bytes();
-
-        // Encrypt the metadata
-        let mut metadata_tag = vec![0u8; 16];
-        let mut metadata = match encrypt_aead(
-            KeySet::cipher(),
-            key.meta_key().unwrap(),
-            Some(&[0u8; 12]),
-            &[],
-            &metadata,
-            &mut metadata_tag,
-        ) {
-            Ok(metadata) => metadata,
-            Err(_) => return Err(MetaError::Encrypt),
-        };
-
-        // Append the encryption tag
-        metadata.append(&mut metadata_tag);
-
-
-
-        // TODO: use proper expire and download count configuration here
-        let info = FileInfo::from(None, Some(1), b64::encode(&metadata), key);
-
-        Ok(info.to_json())
-    }
-
-    /// Create a reader that reads the file as encrypted stream.
-    fn create_reader(
-        &self,
-        key: &KeySet,
-        reporter: Option<Arc<Mutex<ProgressReporter>>>,
-    ) -> Result<impl Read + PipeLen, Error> {
-        // Open the file
-        let file = match File::open(self.path.as_path()) {
-            Ok(file) => file,
-            Err(err) => return Err(FileError::Open(err).into()),
-        };
-
-        // TODO: remove old code
-        // // Create an encrypted reader
-        // let reader = match EncryptedFileReader::new(
-        //     file,
-        //     KeySet::cipher(),
-        //     key.file_key().unwrap(),
-        //     key.iv(),
-        // ) {
-        //     Ok(reader) => reader,
-        //     Err(_) => return Err(ReaderError::Encrypt.into()),
-        // };
-
-        // // Wrap into the encrypted reader
-        // let mut reader = ProgressReader::new(reader).map_err(|_| ReaderError::Progress)?;
-
-        // Get the file length
-        let len = file.metadata().expect("failed to fetch file metadata").len();
-
-        // Build the progress pipe file reader
-        let progress = ProgressPipe::zero(len, reporter);
-        let reader = progress.reader(Box::new(file));
-
-        let ikm = key.secret().to_vec();
-
-        // Build the encrypting file reader
-        // let encrypt = GcmCrypt::encrypt(len as usize, key.file_key().unwrap(), key.iv());
-        let encrypt = EceCrypt::encrypt(len as usize, ikm, None);
-        let reader = encrypt.reader(Box::new(reader));
-
-        Ok(reader)
-    }
-
-    /// Build the request that will be send to the server.
-    fn create_request<R>(
-        &self,
-        client: &Client,
-        key: &KeySet,
-        metadata: &[u8],
-        reader: R,
-    ) -> Request
-        where R: Read + PipeLen + Send + 'static,
-    {
-        // Get the reader output length
-        let len = reader.len_out() as u64;
-
-        // Configure a form to send
-        let part = Part::reader_with_length(reader, len)
-            .mime_str(APPLICATION_OCTET_STREAM.as_ref())
-            .expect("failed to set request mime");
-        let form = Form::new().part("data", part);
-
-        // Define the URL to call
-        // TODO: define endpoint in constant
-        // TODO: create an error for this unwrap
-        let url = self.host.join("api/upload").expect("invalid host");
-
-        // Build the request
-        // TODO: create an error for this unwrap
-        client
-            .post(url.as_str())
-            .header(
-                AUTHORIZATION.as_str(),
-                format!("send-v1 {}", key.auth_key_encoded().unwrap()),
-            )
-            .header("X-File-Metadata", b64::encode(&metadata))
-            .multipart(form)
-            .build()
-            .expect("failed to build an API request")
-    }
-
-    /// Execute the given request, and create a file object that represents the
-    /// uploaded file.
-    fn execute_request(
-        &self,
-        req: Request,
-        client: &Client,
-        key: &KeySet,
-    ) -> Result<(RemoteFile, Option<Vec<u8>>), UploadError> {
-        // Execute the request
-        let mut response = match client.execute(req) {
-            Ok(response) => response,
-            // TODO: attach the error context
-            Err(_) => return Err(UploadError::Request),
-        };
-
-        // Ensure the response is successful
-        ensure_success(&response).map_err(UploadError::Response)?;
-
-        // Try to get the nonce, don't error on failure
-        let nonce = header_nonce(&response).ok();
-
-        // Decode the response
-        let response: UploadResponse = match response.json() {
-            Ok(response) => response,
-            Err(err) => return Err(UploadError::Decode(err)),
-        };
-
-        // Transform the responce into a file object
-        Ok((response.into_file(self.host.clone(), &key)?, nonce))
+        // TODO: RETURN NONCE HERE!
+        Ok((remote_file, None))
     }
 }
 
@@ -464,6 +490,35 @@ impl<'a> FileData<'a> {
     /// Get the file size in bytes.
     pub fn size(&self) -> u64 {
         self.size
+    }
+}
+
+/// A wrapped reader to make it easier to pass around.
+struct Reader {
+    // TODO: use better type
+    inner: Box<dyn ReadLen>,
+}
+
+impl Reader {
+    /// Construct a new wrapped reader.
+    pub fn new(inner: Box<dyn ReadLen>) -> Self {
+        Self { inner }
+    }
+}
+
+impl Read for Reader {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.inner.read(buf)
+    }
+}
+
+impl PipeLen for Reader {
+    fn len_in(&self) -> usize {
+        self.inner.len_in()
+    }
+
+    fn len_out(&self) -> usize {
+        self.inner.len_out()
     }
 }
 

@@ -637,6 +637,8 @@ impl PipeLen for EceReader {
     }
 }
 
+impl ReadLen for EceReader {}
+
 impl PipeLen for EceWriter {
     fn len_in(&self) -> usize {
         self.crypt.len_in()
@@ -646,6 +648,8 @@ impl PipeLen for EceWriter {
         self.crypt.len_out()
     }
 }
+
+impl WriteLen for EceWriter {}
 
 unsafe impl Send for EceReader {}
 unsafe impl Send for EceWriter {}

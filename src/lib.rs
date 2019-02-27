@@ -18,7 +18,7 @@ extern crate time;
 pub extern crate url;
 pub extern crate url_serde;
 extern crate version_compare;
-#[cfg(feature = "send2")]
+#[cfg(feature = "send3")]
 extern crate websocket;
 
 pub mod action;
