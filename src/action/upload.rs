@@ -15,7 +15,7 @@ use reqwest::{Client, Error as ReqwestError, Request};
 use serde_json;
 use url::{ParseError as UrlParseError, Url};
 #[cfg(feature = "send3")]
-use websocket::{ClientBuilder, OwnedMessage};
+use websocket::{ClientBuilder, OwnedMessage, result::WebSocketError};
 
 use super::params::{Error as ParamsError, Params, ParamsData};
 use super::password::{Error as PasswordError, Password};
@@ -31,15 +31,17 @@ use crate::file::{
 use crate::file::remote_file::RemoteFile;
 use crate::io::ChunkRead;
 use crate::pipe::{
-    crypto::{EceCrypt, GcmCrypt},
+    crypto::{ece, EceCrypt, GcmCrypt},
     progress::{ProgressPipe, ProgressReporter},
     prelude::*,
 };
 
+/// The protocol to report to the server when uploading through a websocket.
+const WEBSOCKET_PROTOCOL: &str = "ffsend";
+
 /// A file upload action to a Send server.
 ///
-/// This action is compatible with both Firefox Send v2 and v3, but the server API version to use
-/// must be explicitly given due to a version specific upload method.
+/// The server API version to use must be given.
 pub struct Upload {
     /// The server API version to use.
     version: Version,
@@ -107,8 +109,8 @@ impl Upload {
 
         // Execute the request
         let (result, nonce) = match self.version {
-            Version::V2 => self.upload_v2(client, &key, &metadata, reader)?,
-            Version::V3 => self.upload_v3(&key, &file, reader)?,
+            Version::V2 => self.upload_send2(client, &key, &metadata, reader)?,
+            Version::V3 => self.upload_send3(&key, &file, reader)?,
         };
 
         // Mark the reporter as finished
@@ -189,14 +191,11 @@ impl Upload {
         // Append the encryption tag
         metadata.append(&mut metadata_tag);
 
-        // TODO: use proper expire and download count configuration here
-        let info = FileInfo::from(None, Some(1), b64::encode(&metadata), key);
-
-        Ok(info.to_json())
+        // Build file info for this metadata and return it as JSON
+        Ok(FileInfo::from(None, None, b64::encode(&metadata), key).to_json())
     }
 
     /// Create a reader that reads the file as encrypted stream.
-    // TODO: handle errors!
     fn create_reader(
         &self,
         key: &KeySet,
@@ -217,11 +216,13 @@ impl Upload {
 
         // Build the encrypting file reader
         match self.version {
+            #[cfg(feature = "send2")]
             Version::V2 => {
                 let encrypt = GcmCrypt::encrypt(len as usize, key.file_key().unwrap(), key.iv());
                 let reader = encrypt.reader(Box::new(reader));
                 Ok(Reader::new(Box::new(reader)))
             }
+            #[cfg(feature = "send3")]
             Version::V3 => {
                 let ikm = key.secret().to_vec();
                 let encrypt = EceCrypt::encrypt(len as usize, ikm, None);
@@ -233,7 +234,7 @@ impl Upload {
 
     /// Upload the file to the server, used in Firefox Send v2.
     #[cfg(feature = "send2")]
-    fn upload_v2(
+    fn upload_send2(
         &self,
         client: &Client,
         key: &KeySet,
@@ -241,21 +242,21 @@ impl Upload {
         reader: Reader,
     ) -> Result<(RemoteFile, Option<Vec<u8>>), UploadError> {
         // create the request to send
-        let req = self.create_request_v2(client, &key, &metadata, reader);
+        let req = self.create_request_send2(client, &key, &metadata, reader)?;
 
         // Execute the request
-        self.execute_request_v2(req, client, &key)
+        self.execute_request_send2(req, client, &key)
     }
 
     /// Build the request that will be send to the server, used in Firefox Send v2.
     #[cfg(feature = "send2")]
-    fn create_request_v2(
+    fn create_request_send2(
         &self,
         client: &Client,
         key: &KeySet,
         metadata: &[u8],
         reader: Reader,
-    ) -> Request {
+    ) -> Result<Request, UploadError> {
         // Get the reader output length
         let len = reader.len_out() as u64;
 
@@ -266,12 +267,9 @@ impl Upload {
         let form = Form::new().part("data", part);
 
         // Define the URL to call
-        // TODO: define endpoint in constant
-        // TODO: create an error for this unwrap
-        let url = self.host.join("api/upload").expect("invalid host");
+        let url = self.host.join("api/upload")?;
 
         // Build the request
-        // TODO: create an error for this unwrap
         client
             .post(url.as_str())
             .header(
@@ -281,13 +279,13 @@ impl Upload {
             .header("X-File-Metadata", b64::encode(&metadata))
             .multipart(form)
             .build()
-            .expect("failed to build an API request")
+            .map_err(|_| UploadError::Request)
     }
 
     /// Execute the given request, and create a file object that represents the
     /// uploaded file, used in Firefox Send v2.
     #[cfg(feature = "send2")]
-    fn execute_request_v2(
+    fn execute_request_send2(
         &self,
         req: Request,
         client: &Client,
@@ -315,84 +313,85 @@ impl Upload {
         // Transform the responce into a file object
         Ok((response.into_file(self.host.clone(), &key)?, nonce))
     }
+
     /// Upload the file to the server, used in Firefox Send v3.
-    // TODO: handle errors
-    // TODO: resolve all inner TODOs
     #[cfg(feature = "send3")]
-    fn upload_v3(
+    fn upload_send3(
         &self,
         key: &KeySet,
         file_data: &FileData,
         mut reader: Reader,
-    ) -> Result<(RemoteFile, Option<Vec<u8>>), UploadError> {
-        // TODO: define endpoint in constant
-        let ws_url = self.host.join("api/ws").expect("invalid host");
+    ) -> Result<(RemoteFile, Option<Vec<u8>>), Error> {
+        // Build the uploading websocket URL
+        let ws_url = self.host.join("api/ws").map_err(|e| Error::Upload(e.into()))?;
 
         // Build the websocket client used for uploading
-        let mut ws_client = ClientBuilder::new(ws_url.as_str())
+        let mut client = ClientBuilder::new(ws_url.as_str())
             .expect("failed to set up websocket builder")
-            .add_protocol("rust-websocket")
-            // What is this for?
-            .connect_insecure()
-            .expect("failed to build websocket client");
+            .add_protocol(WEBSOCKET_PROTOCOL)
+            .connect(None)
+            .map_err(|_| Error::Upload(UploadError::Request))?;
 
         // Create file info to sent when uploading
-        let file_info = self.create_file_info(&key, file_data).expect("failed to create file info for upload");
+        let file_info = self.create_file_info(&key, file_data).map_err(|e| -> Error { e.into() })?;
         let ws_metadata = OwnedMessage::Text(file_info);
-        ws_client.send_message(&ws_metadata).expect("failed to send metadata message");
+        client.send_message(&ws_metadata).map_err(|e| Error::Upload(e.into()))?;
 
-        eprintln!("### receiving result");
-        // TODO: handle error results
-        let result = ws_client.recv_message().expect("failed to read result");
+        // Read the upload initialization response from the server
+        let result = client.recv_message().map_err(|_| Error::Upload(UploadError::InvalidResponse))?;
         let upload_response: UploadResponse = match result {
             OwnedMessage::Text(ref data) => serde_json::from_str(data)
-                .expect("failed to deserialize upload request response"),
-            _ => panic!("failed to request file upload"),
+                .map_err(|_| Error::Upload(UploadError::InvalidResponse))?,
+            _ => return Err(UploadError::InvalidResponse.into()),
         };
-        eprintln!("GOT FROM SERVER: {:?}", &upload_response);
 
-        eprintln!("### starting upload");
-
-        // Read the header chunk and send it
-        // TODO: use size from constant
-        let mut header = vec![0u8; 21];
+        // Read the header part, and send it
+        let mut header = vec![0u8; ece::HEADER_LEN as usize];
         reader.read_exact(&mut header).expect("failed to read header from reader");
-        ws_client.send_message(
+        client.send_message(
             &OwnedMessage::Binary(header),
-        ).expect("failed to send header chunk");
+        ).map_err(|e| Error::Upload(e.into()))?;
 
-        // TODO: do not use hard coded value
-        reader.chunks(64 * 1024).enumerate().for_each(|(i, chunk)| {
-            let chunk = chunk.expect("invalid chunk");
+        // Send the whole encrypted file in chunks as binary websocket messages
+        let result = reader.chunks(ece::RS as usize)
+            .fold(None, |result: Option<UploadError>, chunk| {
+                // Skip if an error occurred
+                if result.is_some() {
+                    return result;
+                }
 
-            eprintln!("Sending chunk #{} of {} bytes", i, chunk.len());
-
-            ws_client.send_message(
-                &OwnedMessage::Binary(chunk),
-            ).expect("failed to send chunk");
-
-            // TODO: check if we received an error message
-        });
+                // Send the message, capture errors
+                let message = OwnedMessage::Binary(chunk.expect("invalid chunk"));
+                client.send_message(&message).err().map(|e| e.into())
+            });
+        if let Some(err) = result {
+            return Err(err.into());
+        }
 
         // Send the file footer
-        ws_client.send_message(
+        client.send_message(
             &OwnedMessage::Binary(vec![0]),
-        ).expect("failed to send chunk");
+        ).map_err(|e| Error::Upload(e.into()))?;
 
-        eprintln!("### done uploading");
+        // Make sure we receive a success message from the server
+        let status = match client.recv_message().map_err(|_| Error::Upload(UploadError::InvalidResponse))? {
+            OwnedMessage::Text(status) => Some(status),
+            _ => None,
+        };
+        let ok = status.map(|s| serde_json::from_str::<UploadStatusResponse>(&s))
+            .map(|s| s.is_ok())
+            .unwrap_or(false);
+        if !ok {
+            return Err(UploadError::Response(ResponseError::Undefined).into());
+        }
 
-        // Assert OK! {"ok":true}
-        let result = ws_client.recv_message().expect("failed to get resonse");
-        eprintln!("RESULT: {:?}", result);
+        // Done uploading, explicitly close upload client
+        let _ = client.shutdown();
+        mem::drop(client);
 
-        // Done uploading, close upload client
-        ws_client.shutdown().expect("failed to close websocket");
-        mem::drop(ws_client);
+        // Construct the remote file from the data we've obtained
+        let remote_file = upload_response.into_file(self.host.clone(), &key)?;
 
-        let remote_file = upload_response.into_file(self.host.clone(), &key)
-            .expect("failed to build remote file");
-
-        // TODO: RETURN NONCE HERE!
         Ok((remote_file, None))
     }
 }
@@ -436,6 +435,22 @@ impl UploadResponse {
     }
 }
 
+/// The status response from the server over the websocket during or after uploading.
+/// This defines whether uploading was successful.
+#[derive(Debug, Deserialize)]
+#[cfg(feature = "send3")]
+struct UploadStatusResponse {
+    /// True if ok, false if not.
+    ok: bool,
+}
+
+impl UploadStatusResponse {
+    /// Check if OK.
+    pub fn is_ok(&self) -> bool {
+        self.ok
+    }
+}
+
 /// A struct that holds various file properties, such as it's name and it's
 /// mime type.
 struct FileData<'a> {
@@ -464,8 +479,7 @@ impl<'a> FileData<'a> {
         };
 
         // Get the file size
-        // TODO: do not unwrap here, handle error
-        let size = path.metadata().expect("failed to determine file length").len();
+        let size = path.metadata()?.len();
 
         Ok(Self {
             name,
@@ -590,6 +604,10 @@ pub enum PrepareError {
     /// the file on the fly when it is read.
     #[fail(display = "failed to access the file to upload")]
     Reader(#[cause] ReaderError),
+
+    /// Failed to create a client for uploading a file.
+    #[fail(display = "failed to create uploader client")]
+    Client,
 }
 
 #[derive(Fail, Debug)]
@@ -622,6 +640,12 @@ pub enum FileError {
     Open(#[cause] IoError),
 }
 
+impl From<IoError> for FileError {
+    fn from(err: IoError) -> FileError {
+        FileError::Open(err)
+    }
+}
+
 #[derive(Fail, Debug)]
 pub enum UploadError {
     /// Failed to start or update the uploading progress, because of this the
@@ -633,8 +657,18 @@ pub enum UploadError {
     #[fail(display = "failed to request file upload")]
     Request,
 
-    /// The server responded with an error while uploading.
-    #[fail(display = "bad response from server while uploading")]
+    /// An error occurred while streaming the encrypted file (including file info, header and
+    /// footer) for uploading over a websocket.
+    #[fail(display = "failed to stream file for upload over websocket")]
+    UploadStream(#[cause] WebSocketError),
+
+    /// The server responded with data that was not understood, or did not respond at all while a
+    /// response was espected.
+    #[fail(display = "got invalid response from server")]
+    InvalidResponse,
+
+    /// The server responded with an error for uploading.
+    #[fail(display = "bad response from server for uploading")]
     Response(#[cause] ResponseError),
 
     /// Failed to decode the upload response from the server.
@@ -647,8 +681,31 @@ pub enum UploadError {
     ParseUrl(#[cause] UrlParseError),
 }
 
+impl From<WebSocketError> for UploadError {
+    fn from(err: WebSocketError) -> UploadError {
+        UploadError::UploadStream(err)
+    }
+}
+
+impl From<ResponseError> for UploadError {
+    fn from(err: ResponseError) -> UploadError {
+        UploadError::Response(err)
+    }
+}
+
 impl From<UrlParseError> for UploadError {
     fn from(err: UrlParseError) -> UploadError {
         UploadError::ParseUrl(err)
     }
+}
+
+/// Check whether the given URL is secure, based on a known scheme list.
+pub fn is_secure_url(url: &Url) -> bool {
+    is_secure_scheme(url.scheme())
+}
+
+/// Check whether the given scheme is secure, based on a known list.
+pub fn is_secure_scheme(scheme: &str) -> bool {
+    let scheme = scheme.trim().to_lowercase();
+    &scheme == "https" || &scheme == "wss"
 }

@@ -21,7 +21,7 @@ use super::{Crypt, CryptMode};
 /// The default record size in bytes to use for encryption.
 ///
 /// This value matches the default configured in the Firefox Send v3 source code.
-const RS: u32 = config::ECE_RECORD_SIZE;
+pub const RS: u32 = config::ECE_RECORD_SIZE;
 
 /// The crypto key length.
 const KEY_LEN: usize = 16;
@@ -33,7 +33,7 @@ const TAG_LEN: usize = 16;
 const NONCE_LEN: usize = 12;
 
 /// The length in bytes of the header.
-const HEADER_LEN: u32 = 21;
+pub const HEADER_LEN: u32 = 21;
 
 /// The length in bytes of the crypto salt.
 const SALT_LEN: usize = 16;

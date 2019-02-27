@@ -277,7 +277,7 @@ impl RemoteFile {
     /// This is ofcourse only done for properties that may be empty.
     ///
     /// The file IDs are not asserted for equality.
-    #[allow(unknown_lints, useless_let_if_seq)]
+    #[allow(unknown_lints)]
     pub fn merge(&mut self, other: &RemoteFile, overwrite: bool) -> bool {
         // Remember whether anything has changed
         let mut changed = false;

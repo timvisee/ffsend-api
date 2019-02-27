@@ -2,8 +2,8 @@
 
 use openssl::symm::Mode as OpenSslMode;
 
-mod ece;
-mod gcm;
+pub mod ece;
+pub mod gcm;
 mod traits;
 
 // Re-export modules

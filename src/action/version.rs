@@ -5,7 +5,6 @@ use crate::api;
 use crate::api::request::ensure_success;
 
 /// The Firefox Send version data endpoint.
-// TODO: define this in a global file
 const VERSION_ENDPOINT: &str = "__version__";
 
 /// The endpoint we can probe to determine if the server is running Firefox Send v2.
@@ -18,9 +17,10 @@ const V3_PROBE_ENDPOINT: &str = "app.webmanifest";
 
 /// An action to attempt to find the API version of a Send server.
 ///
-/// TODO: this description?
-/// This action returns an `ExistsResponse`, that defines whether the file
-/// exists, and whether it is protected by a password.
+/// This returns a `Version` as probed, and will return an error if failed to properly determine
+/// the server API version.
+///
+/// This API specification for this action is compatible with both Firefox Send v2 and v3.
 pub struct Version {
     /// The server host.
     host: Url,

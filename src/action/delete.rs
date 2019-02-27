@@ -86,7 +86,7 @@ pub enum Error {
     #[fail(display = "the file has expired or did never exist")]
     Expired,
 
-    /// An error has occurred while sending the filedeletion request.
+    /// An error has occurred while sending the file deletion request.
     #[fail(display = "failed to send the file deletion request")]
     Delete(#[cause] DeleteError),
 }
