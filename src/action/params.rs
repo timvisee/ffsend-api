@@ -18,6 +18,8 @@ pub const PARAMS_DOWNLOAD_MIN: u8 = 1;
 pub const PARAMS_DOWNLOAD_MAX: u8 = 20;
 
 /// An action to set parameters for a shared file.
+///
+/// This API specification for this action is compatible with both Firefox Send v2 and v3.
 pub struct Params<'a> {
     /// The remote file to change the parameters for.
     file: &'a RemoteFile,

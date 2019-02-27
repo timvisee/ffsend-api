@@ -80,16 +80,16 @@ impl Metadata {
     /// Get the file name.
     pub fn name(&self) -> &str {
         match self {
-            Metadata::V2 { name, iv: _, mime: _ } => &name,
-            Metadata::V3 { name, mime: _, size: _, manifest: _ } => &name,
+            Metadata::V2 { name, .. } => &name,
+            Metadata::V3 { name, .. } => &name,
         }
     }
 
     /// Get the file MIME type.
     pub fn mime(&self) -> &str {
         match self {
-            Metadata::V2 { name: _, iv: _, mime } => &mime,
-            Metadata::V3 { name: _, mime, size: _, manifest: _ } => &mime,
+            Metadata::V2 { mime, .. } => &mime,
+            Metadata::V3 { mime, .. } => &mime,
         }
     }
 
@@ -100,8 +100,8 @@ impl Metadata {
     pub fn iv(&self) -> Option<[u8; 12]> {
         // Get the input vector
         let iv = match self {
-            Metadata::V2 { name: _, iv, mime: _ } => iv,
-            Metadata::V3 { name: _, mime: _, size: _, manifest: _ } => return None,
+            Metadata::V2 { iv, .. } => iv,
+            Metadata::V3 { .. } => return None,
         };
 
         // Decode the input vector
@@ -114,8 +114,8 @@ impl Metadata {
     /// Get the file size if set (`>= Send v3`).
     pub fn size(&self) -> Option<u64> {
         match self {
-            Metadata::V2 { name: _, iv: _, mime: _ } => None,
-            Metadata::V3 { name: _, mime: _, size, manifest: _ } => Some(*size),
+            Metadata::V2 { .. } => None,
+            Metadata::V3 { size, .. } => Some(*size),
         }
     }
 

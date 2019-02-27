@@ -9,6 +9,8 @@ use crate::api::url::UrlBuilder;
 use crate::file::remote_file::RemoteFile;
 
 /// An action to fetch info of a shared file.
+///
+/// This API specification for this action is compatible with both Firefox Send v2 and v3.
 pub struct Info<'a> {
     /// The remote file to fetch the info for.
     file: &'a RemoteFile,

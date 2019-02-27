@@ -7,6 +7,8 @@ use crate::file::remote_file::RemoteFile;
 /// An action to check whether a remote file exists.
 /// This aciton returns an `ExistsResponse`, that defines whether the file
 /// exists, and whether it is protected by a password.
+///
+/// This API specification for this action is compatible with both Firefox Send v2 and v3.
 pub struct Exists<'a> {
     /// The remote file to check.
     file: &'a RemoteFile,

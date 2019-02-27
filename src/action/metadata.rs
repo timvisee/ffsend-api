@@ -19,6 +19,9 @@ use crate::file::metadata::Metadata as MetadataData;
 use crate::file::remote_file::RemoteFile;
 
 /// An action to fetch file metadata.
+///
+/// This API specification for this action is compatible with both Firefox Send v2 and v3.
+/// Depending on the server API version, a different metadata enum variant is returned.
 pub struct Metadata<'a> {
     /// The remote file to fetch the metadata for.
     file: &'a RemoteFile,

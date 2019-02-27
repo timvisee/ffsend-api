@@ -19,7 +19,10 @@ use crate::pipe::{
     prelude::*,
 };
 
-/// A file upload action to a Send server.
+/// A file download action to a Send server.
+///
+/// This action is compatible with both Firefox Send v2 and v3, but the server API version to use
+/// must be explicitly given due to a version specific download method.
 pub struct Download<'a> {
     /// The server API version to use when downloading the file.
     version: Version,

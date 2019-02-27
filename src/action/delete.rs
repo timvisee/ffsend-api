@@ -7,6 +7,8 @@ use crate::api::url::UrlBuilder;
 use crate::file::remote_file::RemoteFile;
 
 /// An action to delete a remote file.
+///
+/// This API specification for this action is compatible with both Firefox Send v2 and v3.
 pub struct Delete<'a> {
     /// The remote file to delete.
     file: &'a RemoteFile,
