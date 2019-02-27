@@ -93,20 +93,22 @@ impl Metadata {
         }
     }
 
-    /// Get the input vector if set (`< Send v3`).
+    /// Get the input vector if set.
+    ///
+    /// For Firefox Send v3 and above `None` is returned as no input vector is used.
     // TODO: use an input vector length from a constant
-    pub fn iv(&self) -> [u8; 12] {
-        // TODO: do not panic here
+    pub fn iv(&self) -> Option<[u8; 12]> {
+        // Get the input vector
         let iv = match self {
             Metadata::V2 { name: _, iv, mime: _ } => iv,
-            Metadata::V3 { name: _, mime: _, size: _, manifest: _ } => panic!("no iv, send v2 data"),
+            Metadata::V3 { name: _, mime: _, size: _, manifest: _ } => return None,
         };
 
         // Decode the input vector
         let decoded = b64::decode(iv).unwrap();
 
         // Create a sized array
-        *array_ref!(decoded, 0, 12)
+        Some(*array_ref!(decoded, 0, 12))
     }
 
     /// Get the file size if set (`>= Send v3`).

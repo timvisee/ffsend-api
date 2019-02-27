@@ -105,7 +105,7 @@ impl Upload {
         // Execute the request
         let (result, nonce) = match self.version {
             Version::V2 => self.upload_v2(client, &key, &metadata, reader)?,
-            Version::V3 => self.upload_v3(client, &key, &file, &metadata, reader)?,
+            Version::V3 => self.upload_v3(&key, &file, reader)?,
         };
 
         // Mark the reporter as finished
@@ -162,9 +162,6 @@ impl Upload {
     fn create_file_info(&self, key: &KeySet, file: &FileData) -> Result<String, MetaError> {
         // Determine what filename to use, build the metadata
         let name = self.name.clone().unwrap_or_else(|| file.name().to_owned());
-        //let metadata = Metadata::from_send2(name, file.mime(), file.size());
-
-
 
         // Construct the metadata
         let mime = format!("{}", file.mime());
@@ -188,8 +185,6 @@ impl Upload {
 
         // Append the encryption tag
         metadata.append(&mut metadata_tag);
-
-
 
         // TODO: use proper expire and download count configuration here
         let info = FileInfo::from(None, Some(1), b64::encode(&metadata), key);
@@ -217,7 +212,7 @@ impl Upload {
         let progress = ProgressPipe::zero(len, reporter);
         let reader = progress.reader(Box::new(file));
 
-        // Build the encrypting file rader
+        // Build the encrypting file reader
         match self.version {
             Version::V2 => {
                 let encrypt = GcmCrypt::encrypt(len as usize, key.file_key().unwrap(), key.iv());
@@ -323,15 +318,14 @@ impl Upload {
     #[cfg(feature = "send3")]
     fn upload_v3(
         &self,
-        client: &Client,
         key: &KeySet,
         file_data: &FileData,
-        metadata: &[u8],
         mut reader: Reader,
     ) -> Result<(RemoteFile, Option<Vec<u8>>), UploadError> {
         // TODO: define endpoint in constant
         let ws_url = self.host.join("api/ws").expect("invalid host");
 
+        // Build the websocket client used for uploading
         let mut ws_client = ClientBuilder::new(ws_url.as_str())
             .expect("failed to set up websocket builder")
             .add_protocol("rust-websocket")

@@ -9,6 +9,7 @@ use reqwest::{Client, Response};
 use super::metadata::{Error as MetadataError, Metadata as MetadataAction, MetadataResponse};
 use crate::api::request::{ensure_success, ResponseError};
 use crate::api::url::UrlBuilder;
+use crate::api::Version;
 use crate::crypto::key_set::KeySet;
 use crate::crypto::sig::signature_encoded;
 use crate::file::remote_file::RemoteFile;
@@ -20,6 +21,9 @@ use crate::pipe::{
 
 /// A file upload action to a Send server.
 pub struct Download<'a> {
+    /// The server API version to use when downloading the file.
+    version: Version,
+
     /// The remote file to download.
     file: &'a RemoteFile,
 
@@ -42,6 +46,7 @@ impl<'a> Download<'a> {
     /// It is recommended to check whether the file exists,
     /// unless that is already done.
     pub fn new(
+        version: Version,
         file: &'a RemoteFile,
         target: PathBuf,
         password: Option<String>,
@@ -49,6 +54,7 @@ impl<'a> Download<'a> {
         metadata_response: Option<MetadataResponse>,
     ) -> Self {
         Self {
+            version,
             file,
             target,
             password,
@@ -74,8 +80,11 @@ impl<'a> Download<'a> {
             MetadataAction::new(self.file, self.password.clone(), self.check_exists)
                 .invoke(&client)?
         };
-        // TODO: what to do with this? Only set for Send v2?
-        // key.set_iv(metadata.metadata().iv());
+
+        // Set the input vector if known, depending on the API version
+        if let Some(iv) = metadata.metadata().iv() {
+            key.set_iv(iv);
+        }
 
         // Decide what actual file target to use
         let path = self.decide_path(metadata.metadata().name());
@@ -92,7 +101,7 @@ impl<'a> Download<'a> {
 
         // Create the file writer
         let writer = self
-            .create_file_writer(out, len, &key, reporter.clone())
+            .create_writer(out, len, &key, reporter.clone())
             .map_err(|err| Error::File(path_str.clone(), err))?;
 
         // Download the file
@@ -170,38 +179,31 @@ impl<'a> Download<'a> {
     ///
     /// This writer will will decrypt the input on the fly, and writes the
     /// decrypted data to the given file.
-    fn create_file_writer(
+    fn create_writer(
         &self,
         file: File,
         len: u64,
         key: &KeySet,
         reporter: Option<Arc<Mutex<ProgressReporter>>>,
     ) -> Result<impl Write, FileError> {
-        // TODO: remove old code
-
-        // // Build an encrypted writer
-        // let mut writer = ProgressWriter::new(
-        //     EncryptedFileWriter::new(
-        //         file,
-        //         len as usize,
-        //         KeySet::cipher(),
-        //         key.file_key().unwrap(),
-        //         key.iv(),
-        //     )
-        //     .map_err(|_| FileError::EncryptedWriter)?,
-        // )
-        // .map_err(|_| FileError::EncryptedWriter)?;
-
-        let ikm = key.secret().to_vec();
-
-        // Build the decrypting file writer
-        // let decrypt = GcmCrypt::decrypt(len as usize, key.file_key().unwrap(), key.iv());
-        let decrypt = EceCrypt::decrypt(len as usize, ikm);
-        let writer = decrypt.writer(Box::new(file));
+        // Build the decrypting file writer for the selected server API version
+        let writer: Box<dyn Write> = match self.version {
+            Version::V2 => {
+                let decrypt = GcmCrypt::decrypt(len as usize, key.file_key().unwrap(), key.iv());
+                let writer = decrypt.writer(Box::new(file));
+                Box::new(writer)
+            }
+            Version::V3 => {
+                let ikm = key.secret().to_vec();
+                let decrypt = EceCrypt::decrypt(len as usize, ikm);
+                let writer = decrypt.writer(Box::new(file));
+                Box::new(writer)
+            }
+        };
 
         // Build the progress pipe file writer
         let progress = ProgressPipe::zero(len as u64, reporter);
-        let writer = progress.writer(Box::new(writer));
+        let writer = progress.writer(writer);
 
         Ok(writer)
     }
@@ -237,14 +239,6 @@ impl<'a> Download<'a> {
                 .map_err(|_| DownloadError::Progress)?
                 .finish();
         }
-
-        // TODO: verify in some other way
-        // // Verify the writer
-        // if writer.unwrap().verified() {
-        //     Ok(())
-        // } else {
-        //     Err(DownloadError::Verify)
-        // }
 
         Ok(())
     }
@@ -323,9 +317,9 @@ pub enum DownloadError {
     #[fail(display = "failed to download the file")]
     Download,
 
-    /// Verifying the downloaded file failed.
-    #[fail(display = "file verification failed")]
-    Verify,
+    // /// Verifying the downloaded file failed.
+    // #[fail(display = "file verification failed")]
+    // Verify,
 }
 
 #[derive(Fail, Debug)]
