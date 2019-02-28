@@ -1,5 +1,5 @@
 pub mod b64;
-pub mod hdkf;
+pub mod hkdf;
 pub mod key_set;
 pub mod sig;
 

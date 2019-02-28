@@ -7,6 +7,8 @@ use crate::file::remote_file::RemoteFile;
 /// An action to check whether a remote file exists.
 /// This aciton returns an `ExistsResponse`, that defines whether the file
 /// exists, and whether it is protected by a password.
+///
+/// This API specification for this action is compatible with both Firefox Send v2 and v3.
 pub struct Exists<'a> {
     /// The remote file to check.
     file: &'a RemoteFile,
@@ -29,7 +31,7 @@ impl<'a> Exists<'a> {
         let exists_url = UrlBuilder::api_exists(self.file);
         let mut response = client.get(exists_url).send().map_err(|_| Error::Request)?;
 
-        // Ensure the status code is succesful, check the expiry state
+        // Ensure the status code is successful, check the expiry state
         match ensure_success(&response) {
             Ok(_) => {}
             Err(ResponseError::Expired) => return Ok(ExistsResponse::new(false, false)),
@@ -56,16 +58,17 @@ pub struct ExistsResponse {
     exists: bool,
 
     /// Whether this file requires a password.
-    #[serde(rename = "password")]
-    has_password: bool,
+    // This field is named `password` in Send v2
+    #[serde(rename = "requiresPassword", alias = "password")]
+    requires_password: bool,
 }
 
 impl ExistsResponse {
     /// Construct a new response.
-    pub fn new(exists: bool, has_password: bool) -> Self {
+    pub fn new(exists: bool, requires_password: bool) -> Self {
         ExistsResponse {
             exists,
-            has_password,
+            requires_password,
         }
     }
 
@@ -80,8 +83,14 @@ impl ExistsResponse {
     }
 
     /// Whether the remote file is protected by a password.
+    #[deprecated(since = "0.2", note="please use `requires_password` instead")]
     pub fn has_password(&self) -> bool {
-        self.has_password
+        self.requires_password()
+    }
+
+    /// Whether the remote file is protected by a password.
+    pub fn requires_password(&self) -> bool {
+        self.requires_password
     }
 }
 
@@ -89,7 +98,7 @@ impl Default for ExistsResponse {
     fn default() -> Self {
         ExistsResponse {
             exists: false,
-            has_password: false,
+            requires_password: false,
         }
     }
 }

@@ -8,6 +8,8 @@ use crate::crypto::key_set::KeySet;
 use crate::file::remote_file::RemoteFile;
 
 /// An action to change a password of an uploaded Send file.
+///
+/// This API specification for this action is compatible with both Firefox Send v2 and v3.
 pub struct Password<'a> {
     /// The remote file to change the password for.
     file: &'a RemoteFile,

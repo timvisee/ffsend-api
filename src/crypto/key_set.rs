@@ -1,7 +1,7 @@
 use openssl::symm::Cipher;
 use url::Url;
 
-use super::hdkf::{derive_auth_key, derive_file_key, derive_meta_key};
+use super::hkdf::{derive_auth_key, derive_file_key, derive_meta_key};
 use super::{b64, rand_bytes};
 use crate::api::url::UrlBuilder;
 use crate::file::remote_file::RemoteFile;

@@ -67,7 +67,7 @@ impl RemoteFile {
         // Assign the default expiry time if uncetain
         let expire_uncertain = expire_at.is_none();
         let expire_at =
-            expire_at.unwrap_or(Utc::now() + Duration::seconds(SEND_DEFAULT_EXPIRE_TIME));
+            expire_at.unwrap_or(Utc::now() + Duration::seconds(SEND_DEFAULT_EXPIRE_TIME as i64));
 
         // Build the object
         Self {
@@ -93,7 +93,7 @@ impl RemoteFile {
     ) -> Self {
         // Get the current time
         let now = Utc::now();
-        let expire_at = now + Duration::seconds(SEND_DEFAULT_EXPIRE_TIME);
+        let expire_at = now + Duration::seconds(SEND_DEFAULT_EXPIRE_TIME as i64);
 
         // Construct and return
         Self::new(
@@ -184,7 +184,7 @@ impl RemoteFile {
         if let Some(expire_at) = expire_at {
             self.expire_at = expire_at;
         } else {
-            self.expire_at = Utc::now() + Duration::seconds(SEND_DEFAULT_EXPIRE_TIME);
+            self.expire_at = Utc::now() + Duration::seconds(SEND_DEFAULT_EXPIRE_TIME as i64);
             self.expire_uncertain = true;
         }
     }
@@ -277,7 +277,7 @@ impl RemoteFile {
     /// This is ofcourse only done for properties that may be empty.
     ///
     /// The file IDs are not asserted for equality.
-    #[allow(unknown_lints, useless_let_if_seq)]
+    #[allow(unknown_lints)]
     pub fn merge(&mut self, other: &RemoteFile, overwrite: bool) -> bool {
         // Remember whether anything has changed
         let mut changed = false;

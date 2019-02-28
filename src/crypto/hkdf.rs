@@ -16,9 +16,8 @@ const KEY_AUTH_ITERATIONS: usize = 100;
 
 /// Derive a HKDF key.
 ///
-/// No _salt_ bytes are used in this function.
-///
 /// # Arguments
+/// * salt - Key salt, `None` for no salt
 /// * length - Length of the derived key value that is returned.
 /// * ikm - The input keying material.
 /// * info - Optional context and application specific information to use.
@@ -26,13 +25,13 @@ const KEY_AUTH_ITERATIONS: usize = 100;
 /// # Returns
 /// The output keying material, with the length as as specified in the `length`
 /// argument.
-fn hkdf(length: usize, ikm: &[u8], info: Option<&[u8]>) -> Vec<u8> {
+pub fn hkdf(salt: Option<&[u8]>, length: usize, ikm: &[u8], info: Option<&[u8]>) -> Vec<u8> {
     // Unwrap info or use empty info, define output key material
     let info = info.unwrap_or(&[]);
     let mut okm = vec![0u8; length];
 
     // Derive a HKDF key with the given length
-    Hkdf::<Sha256>::extract(None, &ikm)
+    Hkdf::<Sha256>::extract(salt, &ikm)
         .expand(&info, &mut okm)
         .unwrap();
 
@@ -41,12 +40,12 @@ fn hkdf(length: usize, ikm: &[u8], info: Option<&[u8]>) -> Vec<u8> {
 
 /// Derive a key to use for file data encryption, based on the given `secret`.
 pub fn derive_file_key(secret: &[u8]) -> Vec<u8> {
-    hkdf(16, secret, Some(b"encryption"))
+    hkdf(None, 16, secret, Some(b"encryption"))
 }
 
 /// Derive a key to use for metadata encryption, based on the given `secret`.
 pub fn derive_meta_key(secret: &[u8]) -> Vec<u8> {
-    hkdf(16, secret, Some(b"metadata"))
+    hkdf(None, 16, secret, Some(b"metadata"))
 }
 
 /// Derive a key used for authentication, based on the given `secret`.
@@ -63,7 +62,7 @@ pub fn derive_auth_key(secret: &[u8], password: Option<&str>, url: Option<&Url>)
 
     // Derive a key without a password
     if password.is_none() {
-        return hkdf(KEY_AUTH_SIZE, secret, Some(b"authentication"));
+        return hkdf(None, KEY_AUTH_SIZE, secret, Some(b"authentication"));
     }
 
     // Derive a key with a password and URL

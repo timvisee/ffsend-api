@@ -1,5 +1,7 @@
 #[macro_use]
 extern crate arrayref;
+extern crate byteorder;
+extern crate bytes;
 #[macro_use]
 extern crate derive_builder;
 extern crate failure;
@@ -15,13 +17,18 @@ extern crate serde_json;
 extern crate time;
 pub extern crate url;
 pub extern crate url_serde;
+extern crate version_compare;
+#[cfg(feature = "send3")]
+extern crate websocket;
 
 pub mod action;
-mod api;
+pub mod api;
 pub mod config;
 pub mod crypto;
 mod ext;
 pub mod file;
-pub mod reader;
+#[cfg(feature = "send3")]
+mod io;
+pub mod pipe;
 
 pub use failure::Error;

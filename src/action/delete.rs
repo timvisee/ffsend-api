@@ -7,6 +7,8 @@ use crate::api::url::UrlBuilder;
 use crate::file::remote_file::RemoteFile;
 
 /// An action to delete a remote file.
+///
+/// This API specification for this action is compatible with both Firefox Send v2 and v3.
 pub struct Delete<'a> {
     /// The remote file to delete.
     file: &'a RemoteFile,
@@ -55,7 +57,7 @@ impl<'a> Delete<'a> {
             .send()
             .map_err(|_| DeleteError::Request)?;
 
-        // Ensure the status code is succesful
+        // Ensure the status code is successful
         ensure_success(&response).map_err(|err| err.into())
     }
 }
@@ -84,7 +86,7 @@ pub enum Error {
     #[fail(display = "the file has expired or did never exist")]
     Expired,
 
-    /// An error has occurred while sending the filedeletion request.
+    /// An error has occurred while sending the file deletion request.
     #[fail(display = "failed to send the file deletion request")]
     Delete(#[cause] DeleteError),
 }
