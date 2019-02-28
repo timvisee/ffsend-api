@@ -59,5 +59,4 @@ time = "0.1"
 url = "1.7"
 url_serde = "0.2"
 version-compare = "0.0.6"
-# websocket = { version = "=0.22.2", optional = true }
-websocket = { version = "*", git = "https://github.com/timvisee/rust-websocket.git", optional = true }
+websocket = { version = "0.22.3", optional = true }
