@@ -1,6 +1,6 @@
 [package]
 name = "ffsend-api"
-version = "0.1.1"
+version = "0.2.0"
 authors = ["Tim Visee <timvisee@gmail.com>"]
 license = "MIT"
 readme = "README.md"
@@ -28,11 +28,9 @@ path = "src/lib.rs"
 default = ["send2", "send3"]
 
 # Support for Firefox Send v2
-# TODO: implement feature throughout code
 send2 = []
 
 # Support for Firefox Send v3
-# TODO: implement feature throughout code
 send3 = ["websocket"]
 
 [dependencies]
