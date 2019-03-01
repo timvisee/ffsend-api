@@ -9,14 +9,12 @@ use openssl::symm::{
 };
 use bytes::BytesMut;
 
+use crate::config::TAG_LEN;
 use crate::pipe::{
     DEFAULT_BUF_SIZE,
     prelude::*,
 };
 use super::{Crypt, CryptMode};
-
-/// The size in bytes of crytographic verification tags.
-pub const TAG_LEN: usize = 16;
 
 /// Something that can encrypt or decrypt given data using AES-GCM.
 pub struct GcmCrypt {

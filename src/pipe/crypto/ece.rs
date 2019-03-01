@@ -7,7 +7,7 @@ use byteorder::{BigEndian, ByteOrder};
 use bytes::{Bytes, BytesMut};
 use openssl::symm;
 
-use crate::config;
+use crate::config::{self, TAG_LEN};
 use crate::crypto::{
     hkdf::hkdf,
     rand_bytes,
@@ -25,9 +25,6 @@ pub const RS: u32 = config::ECE_RECORD_SIZE;
 
 /// The crypto key length.
 const KEY_LEN: usize = 16;
-
-/// The length in bytes of the crypto tag.
-const TAG_LEN: usize = 16;
 
 /// The crypto nonce length.
 const NONCE_LEN: usize = 12;

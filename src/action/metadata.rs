@@ -12,12 +12,12 @@ use super::exists::{Error as ExistsError, Exists as ExistsAction};
 use crate::api::nonce::{header_nonce, request_nonce, NonceError};
 use crate::api::request::{ensure_success, ResponseError};
 use crate::api::url::UrlBuilder;
+use crate::config::TAG_LEN;
 use crate::crypto::b64;
 use crate::crypto::key_set::KeySet;
 use crate::crypto::sig::signature_encoded;
 use crate::file::metadata::Metadata as MetadataData;
 use crate::file::remote_file::RemoteFile;
-use crate::pipe::crypto::gcm;
 
 /// An action to fetch file metadata.
 ///
@@ -158,8 +158,8 @@ impl RawMetadataResponse {
         let raw = b64::decode(self.meta())?;
 
         // Get the encrypted metadata, and it's tag
-        let (encrypted, tag) = raw.split_at(raw.len() - 16);
-        assert_eq!(tag.len(), gcm::TAG_LEN);
+        let (encrypted, tag) = raw.split_at(raw.len() - TAG_LEN);
+        assert_eq!(tag.len(), TAG_LEN);
 
         // Decrypt the metadata
         let meta = decrypt_aead(

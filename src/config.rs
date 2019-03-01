@@ -29,6 +29,9 @@ const SEND3_UPLOAD_SIZE_MAX: u64 = 1024 * 1024 * 512;
 #[cfg(feature = "send3")]
 const SEND3_UPLOAD_SIZE_MAX_AUTH: u64 = 1024 * 1024 * 1024 * 4;
 
+/// The length of the tag in bytes we're using for cryptography.
+pub const TAG_LEN: usize = 16;
+
 /// The ECE record size that is used (`>= Send v2`).
 pub const ECE_RECORD_SIZE: u32 = 1024 * 64;
 
