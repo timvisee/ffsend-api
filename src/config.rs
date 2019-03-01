@@ -1,5 +1,7 @@
 use reqwest::StatusCode;
 
+use crate::api::Version;
+
 /// The Send host to use by default.
 pub const SEND_DEFAULT_HOST: &str = "https://send.firefox.com/";
 
@@ -15,8 +17,27 @@ pub const HTTP_STATUS_UNAUTHORIZED: StatusCode = StatusCode::UNAUTHORIZED;
 /// The recommended maximum upload size in bytes.
 pub const UPLOAD_SIZE_MAX_RECOMMENDED: u64 = 1024 * 1024 * 1024;
 
-/// The maximum upload size in bytes.
-pub const UPLOAD_SIZE_MAX: u64 = 1024 * 1024 * 1024 * 2;
+/// The maximum upload size in bytes for Firefox Send v2.
+#[cfg(feature = "send2")]
+const SEND2_UPLOAD_SIZE_MAX: u64 = 1024 * 1024 * 1024 * 2;
+
+/// The maximum upload size in bytes for Firefox Send v3 non-authenticated users.
+#[cfg(feature = "send3")]
+const SEND3_UPLOAD_SIZE_MAX: u64 = 1024 * 1024 * 512;
+
+/// The maximum upload size in bytes for Firefox Send v3 authenticated users.
+#[cfg(feature = "send3")]
+const SEND3_UPLOAD_SIZE_MAX_AUTH: u64 = 1024 * 1024 * 1024 * 4;
 
 /// The ECE record size that is used (`>= Send v2`).
 pub const ECE_RECORD_SIZE: u32 = 1024 * 64;
+
+/// Get the maximum file upload size.
+pub fn upload_size_max(version: Version, auth: bool) -> u64{
+    match version {
+        #[cfg(feature = "send2")]
+        Version::V2 => SEND2_UPLOAD_SIZE_MAX,
+        #[cfg(feature = "send3")]
+        Version::V3 => if auth { SEND3_UPLOAD_SIZE_MAX } else { SEND3_UPLOAD_SIZE_MAX_AUTH },
+    }
+}
