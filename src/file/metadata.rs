@@ -138,9 +138,7 @@ pub struct Manifest {
 impl Manifest {
     /// Construct a new manifest for the given list of files.
     pub fn from(files: Vec<ManifestFile>) -> Self {
-        Self {
-            files,
-        }
+        Self { files }
     }
 
     /// Construct a manifest for a single file, with the given properties.
@@ -167,10 +165,6 @@ pub struct ManifestFile {
 impl ManifestFile {
     /// Construct a new manifest file.
     pub fn from(name: String, mime: String, size: u64) -> Self {
-        ManifestFile {
-            name,
-            mime,
-            size,
-        }
+        ManifestFile { name, mime, size }
     }
 }

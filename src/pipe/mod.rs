@@ -7,29 +7,21 @@
 //! You may use a pipe for archiving (zipping) or to encrypt/decrypt bytes flowing through the
 //! pipe reader or writer.
 
+use bytes::BytesMut;
 use std::cmp::min;
 use std::io::{self, Read, Write};
-use bytes::BytesMut;
 
 pub mod crypto;
 pub mod progress;
 mod traits;
 
 // Re-export modules
-pub use progress::{ProgressPipe, ProgressReader, ProgressWriter, ProgressReporter};
-pub use traits::{Pipe, PipeRead, PipeWrite, PipeLen, ReadLen, WriteLen};
+pub use progress::{ProgressPipe, ProgressReader, ProgressReporter, ProgressWriter};
+pub use traits::{Pipe, PipeLen, PipeRead, PipeWrite, ReadLen, WriteLen};
 
 /// Prelude for common pipe traits.
 pub mod prelude {
-    pub use super::{
-        crypto::prelude::*,
-        Pipe,
-        PipeRead,
-        PipeWrite,
-        PipeLen,
-        ReadLen,
-        WriteLen,
-    };
+    pub use super::{crypto::prelude::*, Pipe, PipeLen, PipeRead, PipeWrite, ReadLen, WriteLen};
 }
 
 /// The default size of byte buffers.
@@ -46,7 +38,8 @@ const DEFAULT_BUF_SIZE: usize = 8 * 1024;
 /// pub type MyReader = PipeReader<MyPipe>;
 /// ```
 pub struct PipeReader<P>
-    where P: Pipe,
+where
+    P: Pipe,
 {
     pipe: P,
     inner: Box<dyn Read>,
@@ -64,14 +57,16 @@ pub struct PipeReader<P>
 /// pub type MyWriter = PipeWriter<MyPipe>;
 /// ```
 pub struct PipeWriter<P>
-    where P: Pipe,
+where
+    P: Pipe,
 {
     pipe: P,
     inner: Box<dyn Write>,
 }
 
 impl<P> PipeRead<P> for PipeReader<P>
-    where P: Pipe,
+where
+    P: Pipe,
 {
     fn new(pipe: P, inner: Box<dyn Read>) -> Self {
         Self {
@@ -83,18 +78,17 @@ impl<P> PipeRead<P> for PipeReader<P>
 }
 
 impl<P> PipeWrite<P> for PipeWriter<P>
-    where P: Pipe,
+where
+    P: Pipe,
 {
     fn new(pipe: P, inner: Box<dyn Write>) -> Self {
-        Self {
-            pipe,
-            inner,
-        }
+        Self { pipe, inner }
     }
 }
 
 impl<P> Read for PipeReader<P>
-    where P: Pipe,
+where
+    P: Pipe,
 {
     fn read(&mut self, mut buf: &mut [u8]) -> io::Result<usize> {
         // Attempt to fill input buffer if has capacity upto default buffer size and output length
@@ -126,7 +120,11 @@ impl<P> Read for PipeReader<P>
             buf[..write].copy_from_slice(&out[..write]);
 
             // Assert there are no unwritten output bytes
-            assert_eq!(write, out.len(), "failed to write all pipe output bytes to output buffer");
+            assert_eq!(
+                write,
+                out.len(),
+                "failed to write all pipe output bytes to output buffer"
+            );
 
             // Return if given buffer is full, or slice to unwritten buffer
             if write == buf.len() {
@@ -141,7 +139,8 @@ impl<P> Read for PipeReader<P>
 }
 
 impl<P> Write for PipeWriter<P>
-    where P: Pipe,
+where
+    P: Pipe,
 {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         // Transform input data through crypter, write result to inner writer

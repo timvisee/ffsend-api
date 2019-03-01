@@ -1,22 +1,16 @@
 //! ECE AES-GCM 128 encrypter/decrypter pipe implementation for Firefox Send v3.
 
-use std::io::{self, Read, Write};
 use std::cmp::min;
+use std::io::{self, Read, Write};
 
 use byteorder::{BigEndian, ByteOrder};
 use bytes::{Bytes, BytesMut};
 use openssl::symm;
 
-use crate::config::{self, TAG_LEN};
-use crate::crypto::{
-    hkdf::hkdf,
-    rand_bytes,
-};
-use crate::pipe::{
-    DEFAULT_BUF_SIZE,
-    prelude::*,
-};
 use super::{Crypt, CryptMode};
+use crate::config::{self, TAG_LEN};
+use crate::crypto::{hkdf::hkdf, rand_bytes};
+use crate::pipe::{prelude::*, DEFAULT_BUF_SIZE};
 
 /// The default record size in bytes to use for encryption.
 ///
@@ -150,11 +144,13 @@ impl EceCrypt {
             CryptMode::Encrypt => self.rs - TAG_LEN as u32 - 1,
 
             // Record size, header length for initial header chunk
-            CryptMode::Decrypt => if self.has_header() {
+            CryptMode::Decrypt => {
+                if self.has_header() {
                     self.rs
                 } else {
                     HEADER_LEN
-                },
+                }
+            }
         }
     }
 
@@ -247,12 +243,15 @@ impl EceCrypt {
         let mut tag = vec![0u8; TAG_LEN];
         let mut ciphertext = symm::encrypt_aead(
             symm::Cipher::aes_128_gcm(),
-            self.key.as_ref().expect("failed to encrypt ECE chunk, missing crypto key"),
+            self.key
+                .as_ref()
+                .expect("failed to encrypt ECE chunk, missing crypto key"),
             Some(&nonce),
             &[],
             &plaintext,
             &mut tag,
-        ).expect("failed to encrypt ECE chunk");
+        )
+        .expect("failed to encrypt ECE chunk");
         ciphertext.extend_from_slice(&tag);
 
         (read, Some(ciphertext))
@@ -281,12 +280,15 @@ impl EceCrypt {
         // Decrypt the chunk, and unpad decrypted payload
         let mut plaintext = symm::decrypt_aead(
             symm::Cipher::aes_128_gcm(),
-            self.key.as_ref().expect("failed to decrypt ECE chunk, missing crypto key"),
+            self.key
+                .as_ref()
+                .expect("failed to decrypt ECE chunk, missing crypto key"),
             Some(&nonce),
             &[],
             payload,
             tag,
-        ).expect("failed to decrypt ECE chunk");
+        )
+        .expect("failed to decrypt ECE chunk");
         unpad(&mut plaintext, self.is_last());
 
         // Update transformed length
@@ -309,7 +311,10 @@ impl EceCrypt {
         let mut header = Vec::with_capacity(HEADER_LEN as usize);
 
         // Add the salt
-        let salt = self.salt.as_ref().expect("failed to create ECE header, no crypto salt specified");
+        let salt = self
+            .salt
+            .as_ref()
+            .expect("failed to create ECE header, no crypto salt specified");
         assert_eq!(salt.len(), SALT_LEN);
         header.extend_from_slice(salt);
 
@@ -339,7 +344,8 @@ impl EceCrypt {
     fn parse_header(&mut self, header: &[u8]) {
         // Assert the header size
         assert_eq!(
-            header.len() as u32, HEADER_LEN,
+            header.len() as u32,
+            HEADER_LEN,
             "failed to decrypt, ECE header is not 21 bytes long",
         );
 
@@ -359,7 +365,10 @@ impl EceCrypt {
 
         // Assert all header bytes have been consumed
         // If this fails, update `len_encrypted` as well
-        assert!(header.is_empty(), "failed to decrypt, not all ECE header bytes are used");
+        assert!(
+            header.is_empty(),
+            "failed to decrypt, not all ECE header bytes are used"
+        );
     }
 
     /// Derive the crypto key and base nonce.
@@ -392,7 +401,10 @@ impl EceCrypt {
     #[inline(always)]
     fn generate_nonce(&self, seq: u32) -> Vec<u8> {
         // Get the base nonce which we need to modify
-        let mut nonce = self.nonce.clone().expect("failed to generate nonce, no base nonce available");
+        let mut nonce = self
+            .nonce
+            .clone()
+            .expect("failed to generate nonce, no base nonce available");
 
         // TODO: slice `nonce` only once, use that for mutating
 
@@ -448,7 +460,9 @@ impl EceCrypt {
     /// Panics if the sequence number exceeds the maximum.
     #[inline(always)]
     fn increase_seq(&mut self) {
-        self.seq = self.seq.checked_add(1)
+        self.seq = self
+            .seq
+            .checked_add(1)
             .expect("failed to crypt ECE payload, record sequence number exceeds limit");
     }
 }
@@ -662,7 +676,10 @@ unsafe impl Send for EceWriter {}
 /// This internally suffixes a padding delimiter to the block, and the padding bytes itself.
 fn pad(block: &mut Vec<u8>, rs: usize, last: bool) {
     // Assert the data fits the records
-    assert!(block.len() + TAG_LEN < rs, "failed to pad ECE ciphertext, data too large for record size");
+    assert!(
+        block.len() + TAG_LEN < rs,
+        "failed to pad ECE ciphertext, data too large for record size"
+    );
 
     // Pad chunks with 1 delimiter and zeros, pad last chunk with single 2 delimiter
     if !last {

@@ -143,7 +143,6 @@ pub enum RawMetadataResponse {
         #[serde(rename = "metadata")]
         meta: String,
     },
-
     // TODO: Use `finalDownload` field?
     // TODO: Use `ttl` field?
 }
@@ -267,7 +266,8 @@ impl<'a> MetadataResponse {
     /// Get the file size in bytes.
     pub fn size(&self) -> u64 {
         // TODO: return proper error if not set, should never happen with current API
-        self.size.unwrap_or_else(|| self.metadata.size().expect("file size unknown, newer API?"))
+        self.size
+            .unwrap_or_else(|| self.metadata.size().expect("file size unknown, newer API?"))
     }
 
     /// Get the nonce.

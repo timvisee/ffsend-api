@@ -115,7 +115,8 @@ impl Version {
     /// This method panics if the host was invalid.
     fn exists(&self, client: &Client, endpoint: &str) -> bool {
         let url = self.host.join(endpoint).expect("invalid host");
-        client.get(url)
+        client
+            .get(url)
             .send()
             .map(|r| r.status())
             .map(|s| s.is_success() || s.is_redirection())

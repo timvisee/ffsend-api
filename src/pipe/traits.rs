@@ -52,7 +52,8 @@ pub trait Pipe: Sized {
 
 /// A reader wrapping another reader, to encrypt or decrypt data read from it.
 pub trait PipeRead<P>: Read
-    where P: Pipe,
+where
+    P: Pipe,
 {
     /// Wrap the given `inner` reader, transform data using `crypt`.
     fn new(pipe: P, inner: Box<dyn Read>) -> Self;
@@ -60,7 +61,8 @@ pub trait PipeRead<P>: Read
 
 /// A writer wrapping another writher, to encrypt or decrypt data it is writen to.
 pub trait PipeWrite<P>: Write
-    where P: Pipe,
+where
+    P: Pipe,
 {
     /// Wrap the given `inner` writer, transform data using `crypt`.
     fn new(pipe: P, inner: Box<dyn Write>) -> Self;

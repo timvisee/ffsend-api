@@ -1,7 +1,7 @@
 use std::cmp::min;
 use std::sync::{Arc, Mutex};
 
-use crate::pipe::{PipeReader, PipeWriter, prelude::*};
+use crate::pipe::{prelude::*, PipeReader, PipeWriter};
 
 pub struct ProgressPipe {
     /// The current progress.
@@ -20,11 +20,7 @@ pub struct ProgressPipe {
 impl ProgressPipe {
     /// Construct a new progress reporting pipe.
     pub fn new(cur: u64, len: u64, reporter: Option<Arc<Mutex<ProgressReporter>>>) -> Self {
-        Self {
-            cur,
-            len,
-            reporter,
-        }
+        Self { cur, len, reporter }
     }
 
     /// Construct a new progress reporting pipe.

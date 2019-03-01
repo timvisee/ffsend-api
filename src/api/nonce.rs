@@ -1,5 +1,5 @@
-use reqwest::{Client, Response};
 use reqwest::header::{HeaderName, WWW_AUTHENTICATE};
+use reqwest::{Client, Response};
 use url::Url;
 
 use crate::api::request::{ensure_success, ResponseError};

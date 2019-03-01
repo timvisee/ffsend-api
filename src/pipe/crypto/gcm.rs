@@ -3,18 +3,12 @@
 use std::cmp::min;
 use std::io::{self, Read, Write};
 
-use openssl::symm::{
-    Cipher as OpenSslCipher,
-    Crypter as OpenSslCrypter,
-};
 use bytes::BytesMut;
+use openssl::symm::{Cipher as OpenSslCipher, Crypter as OpenSslCrypter};
 
-use crate::config::TAG_LEN;
-use crate::pipe::{
-    DEFAULT_BUF_SIZE,
-    prelude::*,
-};
 use super::{Crypt, CryptMode};
+use crate::config::TAG_LEN;
+use crate::pipe::{prelude::*, DEFAULT_BUF_SIZE};
 
 /// Something that can encrypt or decrypt given data using AES-GCM.
 pub struct GcmCrypt {
@@ -82,7 +76,10 @@ impl GcmCrypt {
     ///
     /// The decryption `key` and input vector `iv` must also be given.
     pub fn decrypt(len: usize, key: &[u8], iv: &[u8]) -> Self {
-        assert!(len > TAG_LEN, "failed to create AES-GCM decryptor, encrypted payload too small");
+        assert!(
+            len > TAG_LEN,
+            "failed to create AES-GCM decryptor, encrypted payload too small"
+        );
         Self::new(CryptMode::Decrypt, len - TAG_LEN, key, iv)
     }
 
@@ -116,7 +113,9 @@ impl GcmCrypt {
         // Transform input data through crypter, collect output
         // TODO: do not unwrap here, but try error
         let mut out = vec![0u8; len + block_size];
-        let out_len = self.crypter.update(&input, &mut out)
+        let out_len = self
+            .crypter
+            .update(&input, &mut out)
             .expect("failed to update AES-GCM encrypter with new data");
         out.truncate(out_len);
 
@@ -127,10 +126,13 @@ impl GcmCrypt {
             self.tag = vec![0u8; TAG_LEN];
 
             let mut out_final = vec![0u8; block_size];
-            let final_len = self.crypter.finalize(&mut out_final)
+            let final_len = self
+                .crypter
+                .finalize(&mut out_final)
                 .expect("failed to finalize AES-GCM encrypter");
             out.extend_from_slice(&out_final[..final_len]);
-            self.crypter.get_tag(&mut self.tag)
+            self.crypter
+                .get_tag(&mut self.tag)
                 .expect("failed to get AES-GCM encrypter tag for validation");
 
             // Append tag to output
@@ -172,7 +174,9 @@ impl GcmCrypt {
 
             // Decrypt bytes
             // TODO: do not unwrap, but try error
-            let len = self.crypter.update(data_buf, &mut decrypted)
+            let len = self
+                .crypter
+                .update(data_buf, &mut decrypted)
                 .expect("failed to update AES-GCM decrypter with new data");
 
             // Add decrypted bytes to output
@@ -188,7 +192,9 @@ impl GcmCrypt {
         if self.has_tag() {
             // Set the tag
             // TODO: do not unwrap, but try error
-            self.crypter.set_tag(&self.tag).expect("failed to set AES-GCM decrypter tag for validation");
+            self.crypter
+                .set_tag(&self.tag)
+                .expect("failed to set AES-GCM decrypter tag for validation");
 
             // Create a buffer for any remaining data
             let block_size = self.cipher.block_size();
@@ -196,7 +202,9 @@ impl GcmCrypt {
 
             // Finalize, write all remaining data
             // TODO: do not unwrap, but try error
-            let len = self.crypter.finalize(&mut extra)
+            let len = self
+                .crypter
+                .finalize(&mut extra)
                 .expect("failed to finalize AES-GCM decrypter");
             plaintext.extend_from_slice(&extra[..len]);
         }
@@ -267,10 +275,7 @@ impl PipeRead<GcmCrypt> for GcmReader {
 
 impl PipeWrite<GcmCrypt> for GcmWriter {
     fn new(crypt: GcmCrypt, inner: Box<dyn Write>) -> Self {
-        Self {
-            crypt,
-            inner,
-        }
+        Self { crypt, inner }
     }
 }
 

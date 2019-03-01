@@ -36,11 +36,17 @@ pub const TAG_LEN: usize = 16;
 pub const ECE_RECORD_SIZE: u32 = 1024 * 64;
 
 /// Get the maximum file upload size.
-pub fn upload_size_max(version: Version, auth: bool) -> u64{
+pub fn upload_size_max(version: Version, auth: bool) -> u64 {
     match version {
         #[cfg(feature = "send2")]
         Version::V2 => SEND2_UPLOAD_SIZE_MAX,
         #[cfg(feature = "send3")]
-        Version::V3 => if auth { SEND3_UPLOAD_SIZE_MAX } else { SEND3_UPLOAD_SIZE_MAX_AUTH },
+        Version::V3 => {
+            if auth {
+                SEND3_UPLOAD_SIZE_MAX
+            } else {
+                SEND3_UPLOAD_SIZE_MAX_AUTH
+            }
+        }
     }
 }

@@ -22,10 +22,7 @@ impl<R: Read> Chunks<R> {
     /// Panics if the given `size` is zero.
     pub fn from(reader: R, size: usize) -> Self {
         assert_ne!(size, 0, "chunk size cannot be zero");
-        Self {
-            reader,
-            size,
-        }
+        Self { reader, size }
     }
 }
 
@@ -63,7 +60,8 @@ impl<B: Read> Iterator for Chunks<B> {
 
 /// Chunk iterator implementation for readers.
 pub trait ChunkRead
-    where Self: Read + Sized,
+where
+    Self: Read + Sized,
 {
     /// Returns an iterator over chunks of this reader.
     ///

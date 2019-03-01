@@ -18,8 +18,8 @@ use crate::pipe::crypto::EceCrypt;
 #[cfg(feature = "send2")]
 use crate::pipe::crypto::GcmCrypt;
 use crate::pipe::{
-    progress::{ProgressPipe, ProgressReporter},
     prelude::*,
+    progress::{ProgressPipe, ProgressReporter},
 };
 
 /// A file download action to a Send server.
@@ -226,8 +226,9 @@ impl<'a> Download<'a> {
         len: u64,
         reporter: Option<Arc<Mutex<ProgressReporter>>>,
     ) -> Result<(), DownloadError>
-        where R: Read,
-              W: Write,
+    where
+        R: Read,
+        W: Write,
     {
         // Start the writer
         if let Some(reporter) = reporter.as_ref() {
@@ -324,7 +325,6 @@ pub enum DownloadError {
     /// and writing it to the file system.
     #[fail(display = "failed to download the file")]
     Download,
-
     // /// Verifying the downloaded file failed.
     // #[fail(display = "file verification failed")]
     // Verify,

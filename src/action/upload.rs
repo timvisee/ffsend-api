@@ -15,14 +15,14 @@ use openssl::symm::encrypt_aead;
 use reqwest::header::AUTHORIZATION;
 #[cfg(feature = "send2")]
 use reqwest::multipart::{Form, Part};
-use reqwest::{Client, Error as ReqwestError};
 #[cfg(feature = "send2")]
 use reqwest::Request;
+use reqwest::{Client, Error as ReqwestError};
 #[cfg(feature = "send3")]
 use serde_json;
 use url::{ParseError as UrlParseError, Url};
 #[cfg(feature = "send3")]
-use websocket::{ClientBuilder, OwnedMessage, result::WebSocketError};
+use websocket::{result::WebSocketError, ClientBuilder, OwnedMessage};
 
 use super::params::{Error as ParamsError, Params, ParamsData};
 use super::password::{Error as PasswordError, Password};
@@ -40,13 +40,13 @@ use crate::file::metadata::Metadata;
 use crate::file::remote_file::RemoteFile;
 #[cfg(feature = "send3")]
 use crate::io::ChunkRead;
-#[cfg(feature = "send3")]
-use crate::pipe::crypto::{ece, EceCrypt};
 #[cfg(feature = "send2")]
 use crate::pipe::crypto::GcmCrypt;
+#[cfg(feature = "send3")]
+use crate::pipe::crypto::{ece, EceCrypt};
 use crate::pipe::{
-    progress::{ProgressPipe, ProgressReporter},
     prelude::*,
+    progress::{ProgressPipe, ProgressReporter},
 };
 
 /// The protocol to report to the server when uploading through a websocket.
@@ -223,7 +223,10 @@ impl Upload {
         };
 
         // Get the file length
-        let len = file.metadata().expect("failed to fetch file metadata").len();
+        let len = file
+            .metadata()
+            .expect("failed to fetch file metadata")
+            .len();
 
         // Build the progress pipe file reader
         let progress = ProgressPipe::zero(len, reporter);
@@ -263,7 +266,8 @@ impl Upload {
         let req = self.create_request_send2(client, &key, &metadata, reader)?;
 
         // Execute the request
-        self.execute_request_send2(req, client, &key).map_err(|e| e.into())
+        self.execute_request_send2(req, client, &key)
+            .map_err(|e| e.into())
     }
 
     /// Build the request that will be send to the server, used in Firefox Send v2.
@@ -341,7 +345,10 @@ impl Upload {
         mut reader: Reader,
     ) -> Result<(RemoteFile, Option<Vec<u8>>), Error> {
         // Build the uploading websocket URL
-        let ws_url = self.host.join("api/ws").map_err(|e| Error::Upload(e.into()))?;
+        let ws_url = self
+            .host
+            .join("api/ws")
+            .map_err(|e| Error::Upload(e.into()))?;
 
         // Build the websocket client used for uploading
         let mut client = ClientBuilder::new(ws_url.as_str())
@@ -351,12 +358,18 @@ impl Upload {
             .map_err(|_| Error::Upload(UploadError::Request))?;
 
         // Create file info to sent when uploading
-        let file_info = self.create_file_info(&key, file_data).map_err(|e| -> Error { e.into() })?;
+        let file_info = self
+            .create_file_info(&key, file_data)
+            .map_err(|e| -> Error { e.into() })?;
         let ws_metadata = OwnedMessage::Text(file_info);
-        client.send_message(&ws_metadata).map_err(|e| Error::Upload(e.into()))?;
+        client
+            .send_message(&ws_metadata)
+            .map_err(|e| Error::Upload(e.into()))?;
 
         // Read the upload initialization response from the server
-        let result = client.recv_message().map_err(|_| Error::Upload(UploadError::InvalidResponse))?;
+        let result = client
+            .recv_message()
+            .map_err(|_| Error::Upload(UploadError::InvalidResponse))?;
         let upload_response: UploadResponse = match result {
             OwnedMessage::Text(ref data) => serde_json::from_str(data)
                 .map_err(|_| Error::Upload(UploadError::InvalidResponse))?,
@@ -365,38 +378,46 @@ impl Upload {
 
         // Read the header part, and send it
         let mut header = vec![0u8; ece::HEADER_LEN as usize];
-        reader.read_exact(&mut header).expect("failed to read header from reader");
-        client.send_message(
-            &OwnedMessage::Binary(header),
-        ).map_err(|e| Error::Upload(e.into()))?;
+        reader
+            .read_exact(&mut header)
+            .expect("failed to read header from reader");
+        client
+            .send_message(&OwnedMessage::Binary(header))
+            .map_err(|e| Error::Upload(e.into()))?;
 
         // Send the whole encrypted file in chunks as binary websocket messages
-        let result = reader.chunks(ece::RS as usize)
-            .fold(None, |result: Option<UploadError>, chunk| {
-                // Skip if an error occurred
-                if result.is_some() {
-                    return result;
-                }
+        let result =
+            reader
+                .chunks(ece::RS as usize)
+                .fold(None, |result: Option<UploadError>, chunk| {
+                    // Skip if an error occurred
+                    if result.is_some() {
+                        return result;
+                    }
 
-                // Send the message, capture errors
-                let message = OwnedMessage::Binary(chunk.expect("invalid chunk"));
-                client.send_message(&message).err().map(|e| e.into())
-            });
+                    // Send the message, capture errors
+                    let message = OwnedMessage::Binary(chunk.expect("invalid chunk"));
+                    client.send_message(&message).err().map(|e| e.into())
+                });
         if let Some(err) = result {
             return Err(err.into());
         }
 
         // Send the file footer
-        client.send_message(
-            &OwnedMessage::Binary(vec![0]),
-        ).map_err(|e| Error::Upload(e.into()))?;
+        client
+            .send_message(&OwnedMessage::Binary(vec![0]))
+            .map_err(|e| Error::Upload(e.into()))?;
 
         // Make sure we receive a success message from the server
-        let status = match client.recv_message().map_err(|_| Error::Upload(UploadError::InvalidResponse))? {
+        let status = match client
+            .recv_message()
+            .map_err(|_| Error::Upload(UploadError::InvalidResponse))?
+        {
             OwnedMessage::Text(status) => Some(status),
             _ => None,
         };
-        let ok = status.and_then(|s| serde_json::from_str::<UploadStatusResponse>(&s).ok())
+        let ok = status
+            .and_then(|s| serde_json::from_str::<UploadStatusResponse>(&s).ok())
             .map(|s| s.is_ok())
             .unwrap_or(false);
         if !ok {

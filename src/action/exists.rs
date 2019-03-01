@@ -83,7 +83,7 @@ impl ExistsResponse {
     }
 
     /// Whether the remote file is protected by a password.
-    #[deprecated(since = "0.2", note="please use `requires_password` instead")]
+    #[deprecated(since = "0.2", note = "please use `requires_password` instead")]
     pub fn has_password(&self) -> bool {
         self.requires_password()
     }
