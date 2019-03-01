@@ -1,17 +1,17 @@
-[![Build status on Travis CI][travis-master-badge]][travis-link]
+[![Build status on GitLab CI][gitlab-ci-master-badge]][gitlab-ci-link]
 [![Newest release on crates.io][crate-version-badge]][crate-link]
 [![Documentation][docs-badge]][docs]
 [![Number of downloads on crates.io][crate-download-badge]][crate-link]
 [![Project license][crate-license-badge]](LICENSE)
 
-[crate-link]: https://crates.io/crates/ffsend-api
 [crate-download-badge]: https://img.shields.io/crates/d/ffsend-api.svg
-[crate-version-badge]: https://img.shields.io/crates/v/ffsend-api.svg
 [crate-license-badge]: https://img.shields.io/crates/l/ffsend-api.svg
-[docs]: https://docs.rs/ffsend-api
+[crate-link]: https://crates.io/crates/ffsend-api
+[crate-version-badge]: https://img.shields.io/crates/v/ffsend-api.svg
 [docs-badge]: https://docs.rs/ffsend-api/badge.svg
-[travis-master-badge]: https://travis-ci.org/timvisee/ffsend-api.svg?branch=master
-[travis-link]: https://travis-ci.org/timvisee/ffsend-api
+[docs]: https://docs.rs/ffsend-api
+[gitlab-ci-link]: https://gitlab.com/timvisee/ffsend-api/pipelines
+[gitlab-ci-master-badge]: https://gitlab.com/timvisee/ffsend-api/badges/master/pipeline.svg
 
 # ffsend-api [WIP]
 > A fully featured [Firefox Send][send] API client written in Rust.
