@@ -17,6 +17,7 @@ use crate::crypto::key_set::KeySet;
 use crate::crypto::sig::signature_encoded;
 use crate::file::metadata::Metadata as MetadataData;
 use crate::file::remote_file::RemoteFile;
+use crate::pipe::crypto::gcm;
 
 /// An action to fetch file metadata.
 ///
@@ -158,8 +159,7 @@ impl RawMetadataResponse {
 
         // Get the encrypted metadata, and it's tag
         let (encrypted, tag) = raw.split_at(raw.len() - 16);
-        // TODO: is the tag length correct, remove assert if it is
-        assert_eq!(tag.len(), 16);
+        assert_eq!(tag.len(), gcm::TAG_LEN);
 
         // Decrypt the metadata
         let meta = decrypt_aead(
@@ -170,9 +170,6 @@ impl RawMetadataResponse {
             encrypted,
             &tag,
         )?;
-
-        // TODO: remove after debugging
-        eprintln!("DECRYPTED RAW METADATA: {:?}", String::from_utf8_lossy(&meta));
 
         // Parse the metadata, and return
         Ok(serde_json::from_slice(&meta)?)

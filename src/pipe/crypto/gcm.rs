@@ -16,7 +16,7 @@ use crate::pipe::{
 use super::{Crypt, CryptMode};
 
 /// The size in bytes of crytographic verification tags.
-const TAG_LEN: usize = 16;
+pub const TAG_LEN: usize = 16;
 
 /// Something that can encrypt or decrypt given data using AES-GCM.
 pub struct GcmCrypt {
