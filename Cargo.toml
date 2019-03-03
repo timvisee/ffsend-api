@@ -18,7 +18,7 @@ categories = [
 edition = "2018"
 
 [badges]
-travis-ci = { repository = "timvisee/ffsend-api", branch = "master" }
+gitlab = { repository = "timvisee/ffsend-api", branch = "master" }
 
 [lib]
 name = "ffsend_api"
