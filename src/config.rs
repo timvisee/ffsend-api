@@ -23,11 +23,11 @@ const SEND2_UPLOAD_SIZE_MAX: u64 = 1024 * 1024 * 1024 * 2;
 
 /// The maximum upload size in bytes for Firefox Send v3 non-authenticated users.
 #[cfg(feature = "send3")]
-const SEND3_UPLOAD_SIZE_MAX: u64 = 1024 * 1024 * 512;
+const SEND3_UPLOAD_SIZE_MAX: u64 = 1024 * 1024 * 1024;
 
 /// The maximum upload size in bytes for Firefox Send v3 authenticated users.
 #[cfg(feature = "send3")]
-const SEND3_UPLOAD_SIZE_MAX_AUTH: u64 = 1024 * 1024 * 1024 * 4;
+const SEND3_UPLOAD_SIZE_MAX_AUTH: u64 = ((1024 * 1024 * 1024) as f64 * 2.5f64) as u64;
 
 /// The length of the tag in bytes we're using for cryptography.
 pub const TAG_LEN: usize = 16;
