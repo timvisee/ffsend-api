@@ -25,13 +25,22 @@ name = "ffsend_api"
 path = "src/lib.rs"
 
 [features]
-default = ["send2", "send3"]
+default = ["send2", "send3", "crypto-openssl"]
 
 # Support for Firefox Send v2
 send2 = []
 
 # Support for Firefox Send v3
 send3 = ["websocket"]
+
+# Crypt: openssl backend
+# TODO: stabilize feature name
+crypto-openssl = ["openssl", "reqwest/default-tls"]
+
+# Crypt: ring backend
+# TODO: stabilize feature name
+# TODO: do not depend on openssl
+crypto-ring = ["openssl", "ring", "reqwest/rustls-tls"]
 
 [dependencies]
 arrayref = "0.3"
@@ -46,9 +55,10 @@ hkdf = "0.7"
 hyper = "0.12.20" # same as reqwest
 mime = "0.3.12" # same as reqwest
 mime_guess = "2.0.0-alpha.4"
-openssl = "0.10"
+openssl = { version = "0.10", optional = true }
 regex = "1.1"
-reqwest = "0.9.2"
+reqwest = { version = "0.9.2", default-features = false }
+ring = { version = "0.14", optional = true }
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
