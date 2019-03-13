@@ -58,9 +58,16 @@ cargo-test:
   stage: test
   dependencies: []
   script:
+    # Test default configuration
     - cargo test --verbose
-    - cargo test --no-default-features --features send2
-    - cargo test --no-default-features --features send3
+
+    # Test different Send API versions
+    - cargo test --no-default-features --features send2,crypto-openssl
+    - cargo test --no-default-features --features send3,crypto-openssl
+
+    # Test different crypto backends
+    - cargo test --no-default-features --features send2,send3,crypto-openssl
+    - cargo test --no-default-features --features send2,send3,crypto-ring
 
 # Cargo crate release
 crate:
