@@ -3,5 +3,13 @@ pub mod hkdf;
 pub mod key_set;
 pub mod sig;
 
-// Reexport the cryptographically secure random bytes generator
+// Re-export the cryptographically secure random bytes generator
+#[cfg(feature = "crypto-openssl")]
 pub use super::openssl::rand::rand_bytes;
+
+/// Cryptographically secure random bytes generator.
+#[cfg(feature = "crypto-ring")]
+pub fn rand_bytes(buf: &mut [u8]) -> Result<(), ring::error::Unspecified> {
+    use ring::{self, rand::{SecureRandom, SystemRandom}};
+    SystemRandom::new().fill(buf)
+}
