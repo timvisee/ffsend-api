@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 #[cfg(feature = "send2")]
 use self::mime::APPLICATION_OCTET_STREAM;
 use mime_guess::{guess_mime_type, Mime};
-use openssl::symm::encrypt_aead;
+use openssl::{self, symm::encrypt_aead};
 #[cfg(feature = "send2")]
 use reqwest::header::AUTHORIZATION;
 #[cfg(feature = "send2")]
@@ -160,7 +160,7 @@ impl Upload {
         // Encrypt the metadata
         let mut metadata_tag = vec![0u8; 16];
         let mut metadata = match encrypt_aead(
-            KeySet::cipher(),
+            openssl::symm::Cipher::aes_128_gcm(),
             key.meta_key().unwrap(),
             Some(&[0u8; 12]),
             &[],
@@ -192,7 +192,7 @@ impl Upload {
         // Encrypt the metadata
         let mut metadata_tag = vec![0u8; 16];
         let mut metadata = match encrypt_aead(
-            KeySet::cipher(),
+            openssl::symm::Cipher::aes_128_gcm(),
             key.meta_key().unwrap(),
             Some(&[0u8; 12]),
             &[],

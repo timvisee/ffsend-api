@@ -1,4 +1,3 @@
-use openssl::symm::Cipher;
 use url::Url;
 
 use super::hkdf::{derive_auth_key, derive_file_key, derive_meta_key};
@@ -135,10 +134,5 @@ impl KeySet {
     /// Get the metadata encryption key, if derived.
     pub fn meta_key(&self) -> Option<&Vec<u8>> {
         self.meta_key.as_ref()
-    }
-
-    /// Get the cipher type to use in combination with these keys.
-    pub fn cipher() -> Cipher {
-        Cipher::aes_128_gcm()
     }
 }

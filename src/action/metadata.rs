@@ -1,5 +1,4 @@
 use failure::Error as FailureError;
-use openssl::symm::decrypt_aead;
 use reqwest::header::AUTHORIZATION;
 use reqwest::Client;
 use serde::{
@@ -12,8 +11,8 @@ use super::exists::{Error as ExistsError, Exists as ExistsAction};
 use crate::api::nonce::{header_nonce, request_nonce, NonceError};
 use crate::api::request::{ensure_success, ResponseError};
 use crate::api::url::UrlBuilder;
-use crate::config::TAG_LEN;
-use crate::crypto::b64;
+use crate::crypto;
+use crate::crypto::api::MetadataError;
 use crate::crypto::key_set::KeySet;
 use crate::crypto::sig::signature_encoded;
 use crate::file::metadata::Metadata as MetadataData;
@@ -152,32 +151,14 @@ impl RawMetadataResponse {
     ///
     /// The decrypted data is verified using an included tag.
     /// If verification failed, an error is returned.
-    pub fn decrypt_metadata(&self, key_set: &KeySet) -> Result<MetadataData, FailureError> {
-        // Decode the metadata
-        let raw = b64::decode(self.meta())?;
-
-        // Get the encrypted metadata, and it's tag
-        let (encrypted, tag) = raw.split_at(raw.len() - TAG_LEN);
-        assert_eq!(tag.len(), TAG_LEN);
-
-        // Decrypt the metadata
-        let meta = decrypt_aead(
-            KeySet::cipher(),
-            key_set.meta_key().unwrap(),
-            Some(key_set.iv()),
-            &[],
-            encrypted,
-            &tag,
-        )?;
-
-        // Parse the metadata, and return
-        Ok(serde_json::from_slice(&meta)?)
+    pub fn decrypt_metadata(&self, key_set: &KeySet) -> Result<MetadataData, MetadataError> {
+        crypto::api::decrypt_metadata(self.meta(), key_set)
     }
 
     /// Get the encrypted metadata.
     fn meta(&self) -> &str {
         match self {
-            RawMetadataResponse::V2 { meta, size: _ } => &meta,
+            RawMetadataResponse::V2 { meta, .. } => &meta,
             RawMetadataResponse::V3 { meta } => &meta,
         }
     }
@@ -189,8 +170,8 @@ impl RawMetadataResponse {
     // }
     pub fn size(&self) -> Option<u64> {
         match self {
-            RawMetadataResponse::V2 { meta: _, size } => Some(*size),
-            RawMetadataResponse::V3 { meta: _ } => None,
+            RawMetadataResponse::V2 { size, .. } => Some(*size),
+            RawMetadataResponse::V3 { .. } => None,
         }
     }
 }
