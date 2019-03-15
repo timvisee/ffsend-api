@@ -75,7 +75,7 @@ fn encrypt_aead(key_set: &KeySet, plaintext: &[u8]) -> Result<Vec<u8>, Error> {
         // Encrypt the metadata
         // TODO: do not unwrap here
         let key = aead::SealingKey::new(&aead::AES_128_GCM, key_set.meta_key().unwrap()).unwrap();
-        let nonce = aead::Nonce::try_assume_unique_for_key(key_set.iv()).unwrap();
+        let nonce = aead::Nonce::try_assume_unique_for_key(key_set.nonce()).unwrap();
         let encrypted = aead::seal_in_place(&key, nonce, aead::Aad::empty(), &mut buf, TAG_LEN);
 
         // Verify seal byte count, map data into actual payload
@@ -105,7 +105,7 @@ fn decrypt_aead(key_set: &KeySet, payload: &mut [u8]) -> Result<Vec<u8>, Error> 
         openssl::symm::decrypt_aead(
             openssl::symm::Cipher::aes_128_gcm(),
             key_set.meta_key().unwrap(),
-            Some(key_set.iv()),
+            Some(key_set.nonce()),
             &[],
             encrypted,
             tag,
@@ -119,7 +119,7 @@ fn decrypt_aead(key_set: &KeySet, payload: &mut [u8]) -> Result<Vec<u8>, Error> 
         let key = aead::OpeningKey::new(&aead::AES_128_GCM, key_set.meta_key().unwrap())
             .map_err(|_| Error::Decrypt)?;
         let nonce =
-            aead::Nonce::try_assume_unique_for_key(key_set.iv()).map_err(|_| Error::Decrypt)?;
+            aead::Nonce::try_assume_unique_for_key(key_set.nonce()).map_err(|_| Error::Decrypt)?;
         aead::open_in_place(&key, nonce, aead::Aad::empty(), 0, payload)
             .map(|plaintext| plaintext.to_vec())
             .map_err(|_| Error::Decrypt)

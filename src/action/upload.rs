@@ -151,7 +151,7 @@ impl Upload {
         let name = self.name.clone().unwrap_or_else(|| file.name().to_owned());
 
         // Construct the metadata, encrypt it
-        let metadata = Metadata::from_send2(key_set.iv(), name, &file.mime());
+        let metadata = Metadata::from_send2(key_set.nonce(), name, &file.mime());
         crypto::api::encrypt_metadata(metadata, key_set)
     }
 
@@ -196,7 +196,7 @@ impl Upload {
         match self.version {
             #[cfg(feature = "send2")]
             Version::V2 => {
-                let encrypt = GcmCrypt::encrypt(len as usize, key.file_key().unwrap(), key.iv());
+                let encrypt = GcmCrypt::encrypt(len as usize, key.file_key().unwrap(), key.nonce());
                 let reader = encrypt.reader(Box::new(reader));
                 Ok(Reader::new(Box::new(reader)))
             }
