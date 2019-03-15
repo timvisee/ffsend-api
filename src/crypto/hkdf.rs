@@ -7,10 +7,7 @@ use std::num::NonZeroU32;
 use self::hkdf::Hkdf;
 use self::sha2::Sha256;
 #[cfg(feature = "crypto-openssl")]
-use openssl::{
-    hash::MessageDigest,
-    pkcs5::pbkdf2_hmac,
-};
+use openssl::{hash::MessageDigest, pkcs5::pbkdf2_hmac};
 #[cfg(feature = "crypto-ring")]
 use ring::{digest, pbkdf2};
 use url::Url;

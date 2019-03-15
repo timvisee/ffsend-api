@@ -1,10 +1,5 @@
 #[cfg(feature = "crypto-openssl")]
-use openssl::{
-    error::ErrorStack,
-    hash::MessageDigest,
-    pkey::PKey,
-    sign::Signer,
-};
+use openssl::{error::ErrorStack, hash::MessageDigest, pkey::PKey, sign::Signer};
 #[cfg(feature = "crypto-ring")]
 use ring::{digest, hmac};
 
@@ -46,7 +41,9 @@ fn signature_ring(key: &[u8], data: &[u8]) -> Vec<u8> {
 pub fn signature_encoded(key: &[u8], data: &[u8]) -> Result<String, ()> {
     #[cfg(feature = "crypto-openssl")]
     {
-        signature_openssl(key, data).map(|sig| b64::encode(&sig)).map_err(|_| ())
+        signature_openssl(key, data)
+            .map(|sig| b64::encode(&sig))
+            .map_err(|_| ())
     }
 
     #[cfg(feature = "crypto-ring")]
