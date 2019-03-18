@@ -24,8 +24,6 @@ fn signature_openssl(key: &[u8], data: &[u8]) -> Result<Vec<u8>, ErrorStack> {
 
 /// Compute the signature for the given data and key.
 /// This is done using an HMAC key using the SHA256 digest.
-///
-/// If computing the signature failed, an error is returned.
 #[cfg(feature = "crypto-ring")]
 fn signature_ring(key: &[u8], data: &[u8]) -> Vec<u8> {
     let skey = hmac::SigningKey::new(&digest::SHA256, key);
