@@ -1,6 +1,15 @@
 use std::time::Duration;
 
 use reqwest::{self, IntoUrl};
+#[cfg(feature = "send3")]
+use websocket::{
+    self, client::sync::Client as WsClient, result::WebSocketResult as WsResult,
+    stream::sync::NetworkStream as WsNetworkStream,
+};
+
+/// The protocol to report to the server when uploading through a websocket.
+#[cfg(feature = "send3")]
+const WEBSOCKET_PROTOCOL: &str = "ffsend";
 
 /// A networking client for ffsend actions.
 pub struct Client {
@@ -49,6 +58,28 @@ impl Client {
         self.reqwest.execute(request)
     }
 
+    /// Construct a websocket client connected to the given `url` using the wrapped configuration.
+    #[cfg(feature = "send3")]
+    pub fn websocket(&self, url: &str) -> WsResult<WsClient<Box<dyn WsNetworkStream + Send>>> {
+        // Build the websocket client
+        let mut builder = websocket::ClientBuilder::new(url)
+            .expect("failed to set up websocket builder")
+            .add_protocol(WEBSOCKET_PROTOCOL);
+
+        // Configure basic HTTP authentication
+        if let Some((user, password)) = &self.config.basic_auth {
+            let mut headers = websocket::header::Headers::new();
+            headers.set(websocket::header::Authorization(websocket::header::Basic {
+                username: user.to_owned(),
+                password: password.to_owned(),
+            }));
+            builder = builder.custom_headers(&headers);
+        }
+
+        // Build and connect the client
+        builder.connect(None)
+    }
+
     /// Configure the given reqwest client to match the configuration.
     fn configure(&self, mut client: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
         // Configure basic HTTP authentication
@@ -73,6 +104,7 @@ pub struct ClientConfig {
     ///
     /// Consists of a username, and an optional password.
     basic_auth: Option<(String, Option<String>)>,
+
     // TODO: proxy settings
 }
 
