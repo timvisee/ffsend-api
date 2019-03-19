@@ -1,9 +1,8 @@
-use reqwest::Client;
-
 use crate::api::data::{Error as DataError, OwnedData};
 use crate::api::nonce::{request_nonce, NonceError};
 use crate::api::request::{ensure_success, ResponseError};
 use crate::api::url::UrlBuilder;
+use crate::client::Client;
 use crate::file::remote_file::RemoteFile;
 
 /// An action to delete a remote file.

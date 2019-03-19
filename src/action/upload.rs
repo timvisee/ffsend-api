@@ -15,9 +15,9 @@ use openssl::symm::encrypt_aead;
 use reqwest::header::AUTHORIZATION;
 #[cfg(feature = "send2")]
 use reqwest::multipart::{Form, Part};
+use reqwest::Error as ReqwestError;
 #[cfg(feature = "send2")]
 use reqwest::Request;
-use reqwest::{Client, Error as ReqwestError};
 #[cfg(feature = "send3")]
 use serde_json;
 use url::{ParseError as UrlParseError, Url};
@@ -32,6 +32,7 @@ use crate::api::nonce::header_nonce;
 use crate::api::request::ensure_success;
 use crate::api::request::ResponseError;
 use crate::api::Version;
+use crate::client::Client;
 use crate::crypto::b64;
 use crate::crypto::key_set::KeySet;
 #[cfg(feature = "send3")]

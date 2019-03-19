@@ -21,20 +21,16 @@ impl Client {
         let mut builder = reqwest::ClientBuilder::new();
         match config.timeout {
             Some(timeout) if !transfer => builder = builder.timeout(timeout),
-            _ => {},
+            _ => {}
         }
         match config.transfer_timeout {
             Some(timeout) if transfer => builder = builder.timeout(timeout),
-            _ => {},
+            _ => {}
         }
-        let reqwest = builder.build()
-            .expect("failed to build reqwest client");
+        let reqwest = builder.build().expect("failed to build reqwest client");
 
         // Build the client
-        Self {
-            config,
-            reqwest,
-        }
+        Self { config, reqwest }
     }
 
     /// Create a HTTP GET request through this client, returning a `RequestBuilder`.
@@ -45,6 +41,12 @@ impl Client {
     /// Create a HTTP GET request through this client, returning a `RequestBuilder`.
     pub fn post<U: IntoUrl>(&self, url: U) -> reqwest::RequestBuilder {
         self.configure(self.reqwest.post(url))
+    }
+
+    /// Execute the given reqwest request through the internal reqwest client.
+    // TODO: remove this, as the timeout can't be configured?
+    pub fn execute(&self, request: reqwest::Request) -> reqwest::Result<reqwest::Response> {
+        self.reqwest.execute(request)
     }
 
     /// Configure the given reqwest client to match the configuration.
@@ -71,7 +73,6 @@ pub struct ClientConfig {
     ///
     /// Consists of a username, and an optional password.
     basic_auth: Option<(String, Option<String>)>,
-
     // TODO: proxy settings
 }
 

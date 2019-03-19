@@ -1,8 +1,8 @@
-use reqwest::Client;
 use url::Url;
 
 use crate::api;
 use crate::api::request::ensure_success;
+use crate::client::Client;
 
 /// The Firefox Send version data endpoint.
 const VERSION_ENDPOINT: &str = "__version__";
