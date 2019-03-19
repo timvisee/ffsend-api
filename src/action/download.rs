@@ -4,12 +4,13 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use reqwest::header::AUTHORIZATION;
-use reqwest::{Client, Response};
+use reqwest::Response;
 
 use super::metadata::{Error as MetadataError, Metadata as MetadataAction, MetadataResponse};
 use crate::api::request::{ensure_success, ResponseError};
 use crate::api::url::UrlBuilder;
 use crate::api::Version;
+use crate::client::Client;
 use crate::crypto::key_set::KeySet;
 use crate::crypto::sig::signature_encoded;
 use crate::file::remote_file::RemoteFile;

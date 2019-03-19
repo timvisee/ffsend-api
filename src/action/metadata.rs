@@ -1,7 +1,6 @@
 use failure::Error as FailureError;
 use openssl::symm::decrypt_aead;
 use reqwest::header::AUTHORIZATION;
-use reqwest::Client;
 use serde::{
     de::{Error as SerdeError, Unexpected},
     Deserialize, Deserializer,
@@ -12,6 +11,7 @@ use super::exists::{Error as ExistsError, Exists as ExistsAction};
 use crate::api::nonce::{header_nonce, request_nonce, NonceError};
 use crate::api::request::{ensure_success, ResponseError};
 use crate::api::url::UrlBuilder;
+use crate::client::Client;
 use crate::config::TAG_LEN;
 use crate::crypto::b64;
 use crate::crypto::key_set::KeySet;
