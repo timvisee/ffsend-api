@@ -27,6 +27,7 @@ extern crate websocket;
 
 pub mod action;
 pub mod api;
+pub mod client;
 pub mod config;
 pub mod crypto;
 mod ext;

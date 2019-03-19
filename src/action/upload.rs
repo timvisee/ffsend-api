@@ -14,14 +14,14 @@ use mime_guess::{guess_mime_type, Mime};
 use reqwest::header::AUTHORIZATION;
 #[cfg(feature = "send2")]
 use reqwest::multipart::{Form, Part};
+use reqwest::Error as ReqwestError;
 #[cfg(feature = "send2")]
 use reqwest::Request;
-use reqwest::{Client, Error as ReqwestError};
 #[cfg(feature = "send3")]
 use serde_json;
 use url::{ParseError as UrlParseError, Url};
 #[cfg(feature = "send3")]
-use websocket::{result::WebSocketError, ClientBuilder, OwnedMessage};
+use websocket::{result::WebSocketError, OwnedMessage};
 
 use super::params::{Error as ParamsError, Params, ParamsData};
 use super::password::{Error as PasswordError, Password};
@@ -31,6 +31,7 @@ use crate::api::nonce::header_nonce;
 use crate::api::request::ensure_success;
 use crate::api::request::ResponseError;
 use crate::api::Version;
+use crate::client::Client;
 use crate::crypto::{self, api::MetadataError, key_set::KeySet};
 #[cfg(feature = "send3")]
 use crate::file::info::FileInfo;
@@ -46,10 +47,6 @@ use crate::pipe::{
     prelude::*,
     progress::{ProgressPipe, ProgressReporter},
 };
-
-/// The protocol to report to the server when uploading through a websocket.
-#[cfg(feature = "send3")]
-const WEBSOCKET_PROTOCOL: &str = "ffsend";
 
 /// A file upload action to a Send server.
 ///
@@ -123,7 +120,7 @@ impl Upload {
             #[cfg(feature = "send2")]
             Version::V2 => self.upload_send2(client, &key, &file, reader)?,
             #[cfg(feature = "send3")]
-            Version::V3 => self.upload_send3(&key, &file, reader)?,
+            Version::V3 => self.upload_send3(client, &key, &file, reader)?,
         };
 
         // Mark the reporter as finished
@@ -300,6 +297,7 @@ impl Upload {
     #[cfg(feature = "send3")]
     fn upload_send3(
         &self,
+        client: &Client,
         key: &KeySet,
         file_data: &FileData,
         mut reader: Reader,
@@ -311,10 +309,8 @@ impl Upload {
             .map_err(|e| Error::Upload(e.into()))?;
 
         // Build the websocket client used for uploading
-        let mut client = ClientBuilder::new(ws_url.as_str())
-            .expect("failed to set up websocket builder")
-            .add_protocol(WEBSOCKET_PROTOCOL)
-            .connect(None)
+        let mut client = client
+            .websocket(ws_url.as_str())
             .map_err(|_| Error::Upload(UploadError::Request))?;
 
         // Create file info to sent when uploading
