@@ -56,5 +56,5 @@ sha2 = "0.8"
 time = "0.1"
 url = "1.7"
 url_serde = "0.2"
-version-compare = "0.0.7"
+version-compare = "0.0.8"
 websocket = { version = "0.22.3", optional = true }
