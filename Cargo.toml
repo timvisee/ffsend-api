@@ -1,6 +1,6 @@
 [package]
 name = "ffsend-api"
-version = "0.3.0"
+version = "0.3.2"
 authors = ["Tim Visee <timvisee@gmail.com>"]
 license = "MIT"
 readme = "README.md"
@@ -52,12 +52,12 @@ derive_builder = "0.7"
 failure = "0.1"
 failure_derive = "0.1"
 hkdf = "0.7"
-hyper = "0.12.20" # same as reqwest
-mime = "0.3.12" # same as reqwest
+hyper = "0.12.22" # same as reqwest
+mime = "0.3.7" # same as reqwest
 mime_guess = "2.0.0-alpha.4"
 openssl = { version = "0.10", optional = true }
 regex = "1.1"
-reqwest = { version = "0.9.2", default-features = false }
+reqwest = { version = "0.9.12", default-features = false }
 ring = { version = "0.14", optional = true }
 serde = "1.0"
 serde_derive = "1.0"
@@ -66,5 +66,5 @@ sha2 = "0.8"
 time = "0.1"
 url = "1.7"
 url_serde = "0.2"
-version-compare = "0.0.6"
+version-compare = "0.0.8"
 websocket = { version = "0.22.3", optional = true }
