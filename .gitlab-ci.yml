@@ -38,17 +38,17 @@ variables:
   stage: check
   script:
     - cargo check --verbose
-rust-stable:
+check-stable:
   <<: *check-base
-rust-beta:
+check-beta:
   <<: *check-base
   variables:
     RUST_VERSION: beta
-rust-nightly:
+check-nightly:
   <<: *check-base
   variables:
     RUST_VERSION: nightly
-rust-old:
+check-old:
   <<: *check-base
   variables:
     RUST_VERSION: "1.34.0"
