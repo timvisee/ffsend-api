@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 
 #[cfg(feature = "send2")]
 use self::mime::APPLICATION_OCTET_STREAM;
-use mime_guess::{guess_mime_type, Mime};
+use mime_guess::{self, Mime};
 use openssl::symm::encrypt_aead;
 #[cfg(feature = "send2")]
 use reqwest::header::AUTHORIZATION;
@@ -99,7 +99,7 @@ impl Upload {
     pub fn invoke(
         self,
         client: &Client,
-        reporter: Option<&Arc<Mutex<ProgressReporter>>>,
+        reporter: Option<&Arc<Mutex<dyn ProgressReporter>>>,
     ) -> Result<RemoteFile, Error> {
         // Create file data, generate a key
         let file = FileData::from(&self.path)?;
@@ -211,7 +211,7 @@ impl Upload {
     fn create_reader(
         &self,
         key: &KeySet,
-        reporter: Option<Arc<Mutex<ProgressReporter>>>,
+        reporter: Option<Arc<Mutex<dyn ProgressReporter>>>,
     ) -> Result<Reader, Error> {
         // Open the file
         let file = match File::open(self.path.as_path()) {
@@ -520,7 +520,7 @@ impl<'a> FileData<'a> {
 
         Ok(Self {
             name,
-            mime: guess_mime_type(path),
+            mime: mime_guess::from_path(path).first_or_octet_stream(),
             size,
         })
     }

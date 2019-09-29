@@ -14,17 +14,17 @@ pub struct ProgressPipe {
 
     /// A reporter, to report the progress status to.
     // TODO: do not make this optional, optionally use this pipe instead
-    reporter: Option<Arc<Mutex<ProgressReporter>>>,
+    reporter: Option<Arc<Mutex<dyn ProgressReporter>>>,
 }
 
 impl ProgressPipe {
     /// Construct a new progress reporting pipe.
-    pub fn new(cur: u64, len: u64, reporter: Option<Arc<Mutex<ProgressReporter>>>) -> Self {
+    pub fn new(cur: u64, len: u64, reporter: Option<Arc<Mutex<dyn ProgressReporter>>>) -> Self {
         Self { cur, len, reporter }
     }
 
     /// Construct a new progress reporting pipe.
-    pub fn zero(len: u64, reporter: Option<Arc<Mutex<ProgressReporter>>>) -> Self {
+    pub fn zero(len: u64, reporter: Option<Arc<Mutex<dyn ProgressReporter>>>) -> Self {
         Self::new(0, len, reporter)
     }
 }
