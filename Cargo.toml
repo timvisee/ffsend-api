@@ -57,4 +57,4 @@ time = "0.1"
 url = "1.7"
 url_serde = "0.2"
 version-compare = "0.0.9"
-websocket = { version = "0.22.3", optional = true }
+websocket = { version = "0.23.0", optional = true }
