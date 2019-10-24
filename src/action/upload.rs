@@ -24,7 +24,9 @@ use url::{ParseError as UrlParseError, Url};
 #[cfg(feature = "send3")]
 use websocket::{result::WebSocketError, OwnedMessage};
 
-use super::params::{Error as ParamsError, Params, ParamsData};
+#[cfg(feature = "send2")]
+use super::params::Params;
+use super::params::{Error as ParamsError, ParamsData};
 use super::password::{Error as PasswordError, Password};
 #[cfg(feature = "send2")]
 use crate::api::nonce::header_nonce;
@@ -135,9 +137,20 @@ impl Upload {
             Password::new(&result, &password, nonce.clone()).invoke(client)?;
         }
 
-        // Change parameters if set
-        if let Some(params) = self.params {
-            Params::new(&result, params, nonce.clone()).invoke(client)?;
+        // Change parameters if any non-default, are already set with upload for Send v3
+        #[cfg(feature = "send2")]
+        {
+            #[allow(unreachable_patterns)]
+            match self.version {
+                Version::V2 => {
+                    if let Some(params) = self.params {
+                        if !params.is_empty() {
+                            Params::new(&result, params, nonce.clone()).invoke(client)?;
+                        }
+                    }
+                }
+                _ => {}
+            }
         }
 
         Ok(result)
@@ -203,8 +216,12 @@ impl Upload {
         // Append the encryption tag
         metadata.append(&mut metadata_tag);
 
+        // Get the expiry time and donwload limit
+        let expiry = self.params.as_ref().and_then(|p| p.expiry_time);
+        let downloads = self.params.as_ref().and_then(|p| p.download_limit);
+
         // Build file info for this metadata and return it as JSON
-        Ok(FileInfo::from(None, None, b64::encode(&metadata), key).to_json())
+        Ok(FileInfo::from(expiry, downloads, b64::encode(&metadata), key).to_json())
     }
 
     /// Create a reader that reads the file as encrypted stream.

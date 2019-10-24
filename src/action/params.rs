@@ -2,6 +2,7 @@ use crate::api::data::{Error as DataError, OwnedData};
 use crate::api::nonce::{request_nonce, NonceError};
 use crate::api::request::{ensure_success, ResponseError};
 use crate::api::url::UrlBuilder;
+use crate::api::Version;
 use crate::client::Client;
 use crate::file::remote_file::RemoteFile;
 
@@ -79,27 +80,37 @@ impl<'a> Params<'a> {
 }
 
 /// The parameters data object, that is sent to the server.
-// TODO: make sure downloads are in-bound when using the builder
+// TODO: make sure builder parameters are in-bound as well
 #[derive(Clone, Debug, Builder, Serialize)]
 pub struct ParamsData {
     /// The number of times this file may be downloaded.
-    /// This value must be in the `(0,20)` bounds, as enforced by Send servers.
-    #[serde(rename = "dlimit")]
-    download_limit: Option<u8>,
+    /// This value must be within a specific range, as enforced by Send servers.
+    #[serde(default)]
+    #[builder(default)]
+    pub download_limit: Option<u8>,
+
+    /// The time in seconds after when the file expires.
+    /// This value must be within a specific range, as enforced by Send servers.
+    /// Only used with Send v3.
+    #[serde(default)]
+    #[builder(default)]
+    #[serde(rename = "timeLimit")]
+    pub expiry_time: Option<usize>,
 }
 
 impl ParamsData {
     /// Construct a new parameters object, that is empty.
     pub fn new() -> Self {
-        ParamsData {
-            download_limit: None,
-        }
+        Self::default()
     }
 
     /// Create a new parameters data object, with the given parameters.
-    // TODO: the downloads must be between bounds
-    pub fn from(download_limit: Option<u8>) -> Self {
-        ParamsData { download_limit }
+    // TODO: the values must be between bounds
+    pub fn from(download_limit: Option<u8>, expiry_time: Option<usize>) -> Self {
+        ParamsData {
+            download_limit,
+            expiry_time,
+        }
     }
 
     /// Set the maximum number of allowed downloads, after which the file
@@ -114,6 +125,8 @@ impl ParamsData {
         &mut self,
         download_limit: Option<u8>,
     ) -> Result<(), ParamsDataError> {
+        // TODO: use better bound check based on version
+
         // Check the download limit bounds
         if let Some(d) = download_limit {
             if d < PARAMS_DOWNLOAD_MIN || d > PARAMS_DOWNLOAD_MAX {
@@ -126,11 +139,33 @@ impl ParamsData {
         Ok(())
     }
 
+    /// Set the expiry time in seconds for files.
+    ///
+    /// `None` may be given, to keep this parameter as is.
+    ///
+    /// An error may be returned if the expiry time value is out of the allowed
+    /// bound. These bounds are fixed and enforced by the server.
+    #[cfg(feature = "send3")]
+    pub fn set_expiry_time(&mut self, expiry_time: Option<usize>) -> Result<(), ParamsDataError> {
+        // TODO: do proper bound check based on version
+
+        // // Check the download limit bounds
+        // if let Some(d) = expiry_time {
+        //     if d < PARAMS_DOWNLOAD_MIN || d > PARAMS_DOWNLOAD_MAX {
+        //         return Err(ParamsDataError::DownloadBounds);
+        //     }
+        // }
+
+        // Set the expiry time
+        self.expiry_time = expiry_time;
+        Ok(())
+    }
+
     /// Check whether this parameters object is empty,
     /// and wouldn't change any parameter on the server when sent.
     /// Sending an empty parameter data object would thus be useless.
     pub fn is_empty(&self) -> bool {
-        self.download_limit.is_none()
+        self.download_limit.is_none() && self.expiry_time.is_none()
     }
 }
 
@@ -138,6 +173,7 @@ impl Default for ParamsData {
     fn default() -> ParamsData {
         ParamsData {
             download_limit: None,
+            expiry_time: None,
         }
     }
 }
