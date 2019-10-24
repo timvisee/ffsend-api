@@ -143,7 +143,8 @@ impl Upload {
             #[allow(unreachable_patterns)]
             match self.version {
                 Version::V2 => {
-                    if let Some(params) = self.params {
+                    if let Some(mut params) = self.params {
+                        params.normalize(self.version);
                         if !params.is_empty() {
                             Params::new(&result, params, nonce.clone()).invoke(client)?;
                         }

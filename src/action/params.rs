@@ -167,6 +167,22 @@ impl ParamsData {
     pub fn is_empty(&self) -> bool {
         self.download_limit.is_none() && self.expiry_time.is_none()
     }
+
+    /// Normalize this data for the given version.
+    ///
+    /// For example, Send v2 does not support the expiry time field. If normalizing for this
+    /// version this field is dropped from the struct.
+    #[allow(unused_variables)]
+    pub fn normalize(&mut self, version: Version) {
+        #[cfg(feature = "send2")]
+        {
+            #[allow(unreachable_patterns)]
+            match version {
+                Version::V2 => self.expiry_time = None,
+                _ => {}
+            }
+        }
+    }
 }
 
 impl Default for ParamsData {
