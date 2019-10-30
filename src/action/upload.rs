@@ -9,6 +9,7 @@ use std::sync::{Arc, Mutex};
 
 #[cfg(feature = "send2")]
 use self::mime::APPLICATION_OCTET_STREAM;
+use chrono::{DateTime, Duration, Utc};
 use mime_guess::{self, Mime};
 use openssl::symm::encrypt_aead;
 #[cfg(feature = "send2")]
@@ -348,7 +349,7 @@ impl Upload {
         };
 
         // Transform the responce into a file object
-        Ok((response.into_file(self.host.clone(), &key)?, nonce))
+        Ok((response.into_file(self.host.clone(), &key, None)?, nonce))
     }
 
     /// Upload the file to the server, used in Firefox Send v3.
@@ -443,7 +444,14 @@ impl Upload {
         mem::drop(client);
 
         // Construct the remote file from the data we've obtained
-        let remote_file = upload_response.into_file(self.host.clone(), &key)?;
+        let remote_file = upload_response.into_file(
+            self.host.clone(),
+            &key,
+            self.params.as_ref().and_then(|p| {
+                p.expiry_time
+                    .map(|s| Utc::now() + Duration::seconds(s as i64))
+            }),
+        )?;
 
         Ok((remote_file, None))
     }
@@ -477,9 +485,16 @@ impl UploadResponse {
     /// Convert this response into a file object.
     ///
     /// The `host` and `key` must be given.
-    pub fn into_file(self, host: Url, key: &KeySet) -> Result<RemoteFile, UploadError> {
-        Ok(RemoteFile::new_now(
+    pub fn into_file(
+        self,
+        host: Url,
+        key: &KeySet,
+        expiry_time: Option<DateTime<Utc>>,
+    ) -> Result<RemoteFile, UploadError> {
+        Ok(RemoteFile::new(
             self.id,
+            Some(Utc::now()),
+            expiry_time,
             host,
             Url::parse(&self.url)?,
             key.secret().to_vec(),
