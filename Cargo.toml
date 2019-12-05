@@ -1,6 +1,6 @@
 [package]
 name = "ffsend-api"
-version = "0.4.3"
+version = "0.4.4"
 authors = ["Tim Visee <tim@visee.me>"]
 license = "MIT"
 readme = "README.md"
