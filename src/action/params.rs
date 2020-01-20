@@ -6,15 +6,13 @@ use crate::api::Version;
 use crate::client::Client;
 use crate::file::remote_file::RemoteFile;
 
-/// The default download count.
-pub const PARAMS_DEFAULT_DOWNLOAD: u8 = 1;
-pub const PARAMS_DEFAULT_DOWNLOAD_STR: &str = "1";
-
 /// The minimum allowed number of downloads, enforced by the server.
+// TODO: remove parameter, use from config
 pub const PARAMS_DOWNLOAD_MIN: u8 = 1;
 
 /// The maximum (inclusive) allowed number of downloads,
 /// enforced by the server.
+// TODO: remove parameter, use from config
 pub const PARAMS_DOWNLOAD_MAX: u8 = 20;
 
 /// An action to set parameters for a shared file.
