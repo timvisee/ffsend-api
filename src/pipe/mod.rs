@@ -107,7 +107,7 @@ where
 
         // Move input buffer into the pipe
         let (read, out) = self.pipe.pipe(&self.buf);
-        self.buf.split_to(read);
+        let _ = self.buf.split_to(read);
 
         // Number of bytes written to given buffer
         let mut total = 0;
