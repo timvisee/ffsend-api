@@ -102,16 +102,18 @@ impl Client {
 #[derive(Clone, Debug, Builder)]
 pub struct ClientConfig {
     /// Connection timeout for control requests.
+    #[builder(default = "Some(Duration::from_secs(30))")]
     timeout: Option<Duration>,
 
     /// Connection timeout specific to file transfers.
+    #[builder(default = "Some(Duration::from_secs(86400))")]
     transfer_timeout: Option<Duration>,
 
     /// Basic HTTP authentication credentials.
     ///
     /// Consists of a username, and an optional password.
+    #[builder(default)]
     basic_auth: Option<(String, Option<String>)>,
-
     // TODO: proxy settings
 }
 
