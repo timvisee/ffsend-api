@@ -61,7 +61,6 @@ cargo-test:
   dependencies: []
   script:
     - cargo test --verbose
-    - cargo test --no-default-features --features send2
     - cargo test --no-default-features --features send3
 
 # Cargo crate release

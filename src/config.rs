@@ -30,12 +30,15 @@ const SEND3_MAX_UPLOAD_SIZE: u64 = 1024 * 1024 * 1024;
 const SEND3_MAX_UPLOAD_SIZE_AUTH: u64 = ((1024 * 1024 * 1024) as f64 * 2.5f64) as u64;
 
 /// Default number of maximum downloads for a Send v2 file.
+#[cfg(feature = "send2")]
 const SEND2_DEFAULT_DOWNLOADS: usize = 20;
 
 /// Default number of maximum downloads for a Send v3 file.
+#[cfg(feature = "send3")]
 const SEND3_DEFAULT_DOWNLOADS: usize = 1;
 
 /// Default number of maximum downloads for a Send v3 file when authenticated.
+#[cfg(feature = "send3")]
 const SEND3_DEFAULT_DOWNLOADS_AUTH: usize = 20;
 
 /// Supported maximum number of download values for a file for Firefox Send v2.
