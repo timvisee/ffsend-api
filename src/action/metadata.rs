@@ -94,7 +94,7 @@ impl<'a> Metadata<'a> {
             .map_err(|_| MetaError::ComputeSignature)?;
 
         // Build the request, fetch the encrypted metadata
-        let mut response = client
+        let response = client
             .get(UrlBuilder::api_metadata(self.file))
             .header(AUTHORIZATION.as_str(), format!("send-v1 {}", sig))
             .send()

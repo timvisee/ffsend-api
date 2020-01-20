@@ -56,7 +56,7 @@ impl Version {
     fn fetch_version(&self, client: &Client) -> Result<api::Version, Error> {
         // Build the version URL, request the version
         let version_url = self.host.join(VERSION_ENDPOINT).expect("invalid host");
-        let mut response = client.get(version_url).send().map_err(|_| Error::Request)?;
+        let response = client.get(version_url).send().map_err(|_| Error::Request)?;
 
         // Ensure the status code is successful
         match ensure_success(&response) {

@@ -3,8 +3,7 @@ use std::io::{self, Error as IoError, Read, Write};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use reqwest::header::AUTHORIZATION;
-use reqwest::Response;
+use reqwest::{blocking::Response, header::AUTHORIZATION};
 
 use super::metadata::{Error as MetadataError, Metadata as MetadataAction, MetadataResponse};
 use crate::api::request::{ensure_success, ResponseError};

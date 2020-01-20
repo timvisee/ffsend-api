@@ -4,7 +4,6 @@ extern crate regex;
 use self::chrono::{DateTime, Duration, Utc};
 use self::regex::Regex;
 use url::{ParseError as UrlParseError, Url};
-use url_serde;
 
 use crate::api::url::UrlBuilder;
 use crate::config::SEND_DEFAULT_EXPIRE_TIME;
@@ -39,11 +38,9 @@ pub struct RemoteFile {
     expire_uncertain: bool,
 
     /// The host the file was uploaded to.
-    #[serde(with = "url_serde")]
     host: Url,
 
     /// The file URL that was provided by the server.
-    #[serde(with = "url_serde")]
     url: Url,
 
     /// The secret key that is required to download the file.

@@ -1,5 +1,7 @@
-use reqwest::header::{HeaderName, WWW_AUTHENTICATE};
-use reqwest::Response;
+use reqwest::{
+    blocking::Response,
+    header::{HeaderName, WWW_AUTHENTICATE},
+};
 use url::Url;
 
 use crate::api::request::{ensure_success, ResponseError};

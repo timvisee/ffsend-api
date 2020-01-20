@@ -13,12 +13,12 @@ use chrono::{DateTime, Duration, Utc};
 use mime_guess::{self, Mime};
 use openssl::symm::encrypt_aead;
 #[cfg(feature = "send2")]
+use reqwest::blocking::multipart::{Form, Part};
+#[cfg(feature = "send2")]
+use reqwest::blocking::Request;
+#[cfg(feature = "send2")]
 use reqwest::header::AUTHORIZATION;
-#[cfg(feature = "send2")]
-use reqwest::multipart::{Form, Part};
 use reqwest::Error as ReqwestError;
-#[cfg(feature = "send2")]
-use reqwest::Request;
 #[cfg(feature = "send3")]
 use serde_json;
 use url::{ParseError as UrlParseError, Url};
@@ -330,7 +330,7 @@ impl Upload {
         key: &KeySet,
     ) -> Result<(RemoteFile, Option<Vec<u8>>), UploadError> {
         // Execute the request
-        let mut response = match client.execute(req) {
+        let response = match client.execute(req) {
             Ok(response) => response,
             // TODO: attach the error context
             Err(_) => return Err(UploadError::Request),
