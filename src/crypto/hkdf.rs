@@ -32,6 +32,7 @@ pub fn hkdf(salt: Option<&[u8]>, length: usize, ikm: &[u8], info: Option<&[u8]>)
 
     // Derive a HKDF key with the given length
     Hkdf::<Sha256>::extract(salt, &ikm)
+        .1
         .expand(&info, &mut okm)
         .unwrap();
 
