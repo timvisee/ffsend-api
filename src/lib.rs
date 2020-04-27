@@ -4,6 +4,9 @@ extern crate arrayref;
 extern crate derive_builder;
 #[macro_use]
 extern crate failure_derive;
+// TODO: enable this attribute for selective compilation
+// #[cfg(feature = "crypto-openssl")]
+extern crate openssl;
 pub extern crate reqwest;
 #[macro_use]
 extern crate serde_derive;
