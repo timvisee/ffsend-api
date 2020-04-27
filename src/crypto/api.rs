@@ -4,6 +4,7 @@ use openssl;
 use ring::aead::{self, BoundKey};
 use serde_json;
 
+#[cfg(feature = "crypto-openssl")]
 use crate::config::TAG_LEN;
 use crate::crypto::{b64, key_set::KeySet};
 use crate::file::metadata::Metadata;
@@ -43,6 +44,8 @@ pub fn decrypt_metadata(metadata: &str, key_set: &KeySet) -> Result<Metadata, Me
 /// The default cipher for Firefox Send is used.
 // TODO: do not drop errors here
 fn encrypt_aead(key_set: &KeySet, plaintext: &[u8]) -> Result<Vec<u8>, Error> {
+    let nonce = [0u8; 12];
+
     #[cfg(feature = "crypto-openssl")]
     {
         // Encrypt the metadata, append the tag
@@ -50,7 +53,7 @@ fn encrypt_aead(key_set: &KeySet, plaintext: &[u8]) -> Result<Vec<u8>, Error> {
         let mut metadata = openssl::symm::encrypt_aead(
             openssl::symm::Cipher::aes_128_gcm(),
             key_set.meta_key().unwrap(),
-            Some(&[0u8; 12]),
+            Some(&nonce),
             &[],
             &plaintext,
             &mut metadata_tag,
@@ -64,10 +67,9 @@ fn encrypt_aead(key_set: &KeySet, plaintext: &[u8]) -> Result<Vec<u8>, Error> {
     {
         // We need to own the buffer to seal in place, make room for appended tag
         let mut buf = plaintext.to_vec();
-        buf.append(&mut vec![0; TAG_LEN]);
 
         // Prepare sealing key
-        let nonce = NonceOnce::from_slice(key_set.nonce());
+        let nonce = NonceOnce::new(nonce);
         let aad = aead::Aad::empty();
         let unbound_key =
             aead::UnboundKey::new(&aead::AES_128_GCM, key_set.meta_key().unwrap()).unwrap();
