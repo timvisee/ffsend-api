@@ -29,8 +29,17 @@ const SEND3_MAX_UPLOAD_SIZE: u64 = 1024 * 1024 * 1024;
 #[cfg(feature = "send3")]
 const SEND3_MAX_UPLOAD_SIZE_AUTH: u64 = ((1024 * 1024 * 1024) as f64 * 2.5f64) as u64;
 
-/// Default number of maximum downloads for a Send file.
-pub const SEND_DEFAULT_DOWNLOADS: usize = 20;
+/// Default number of maximum downloads for a Send v2 file.
+#[cfg(feature = "send2")]
+const SEND2_DEFAULT_DOWNLOADS: usize = 20;
+
+/// Default number of maximum downloads for a Send v3 file.
+#[cfg(feature = "send3")]
+const SEND3_DEFAULT_DOWNLOADS: usize = 1;
+
+/// Default number of maximum downloads for a Send v3 file when authenticated.
+#[cfg(feature = "send3")]
+const SEND3_DEFAULT_DOWNLOADS_AUTH: usize = 20;
 
 /// Supported maximum number of download values for a file for Firefox Send v2.
 #[cfg(feature = "send2")]
@@ -52,6 +61,7 @@ pub const SEND_EXPIRY_DEFAULT: usize = 86_400;
 const SEND2_EXPIRY_MAX: [usize; 1] = [86_400];
 
 /// Supported maximum file expiry time values in seconds for a file for Firefox Send v3 non-authenticated users.
+// TODO: use single biggest value, can use any expiry time now
 #[cfg(feature = "send3")]
 const SEND3_EXPIRY_MAX: [usize; 3] = [300, 3600, 86_400];
 
@@ -76,6 +86,24 @@ pub fn upload_size_max(version: Version, auth: bool) -> u64 {
                 SEND3_MAX_UPLOAD_SIZE_AUTH
             } else {
                 SEND3_MAX_UPLOAD_SIZE
+            }
+        }
+    }
+}
+
+/// Get supported maximum number of download values for a Send file.
+///
+/// The remote server only accepts any of these specific values, and nothing in between.
+pub fn downloads_default(version: Version, auth: bool) -> usize {
+    match version {
+        #[cfg(feature = "send2")]
+        Version::V2 => SEND2_DEFAULT_DOWNLOADS,
+        #[cfg(feature = "send3")]
+        Version::V3 => {
+            if auth {
+                SEND3_DEFAULT_DOWNLOADS_AUTH
+            } else {
+                SEND3_DEFAULT_DOWNLOADS
             }
         }
     }

@@ -1,4 +1,4 @@
-use reqwest::{Response, StatusCode};
+use reqwest::{blocking::Response, StatusCode};
 
 use crate::config::{HTTP_STATUS_EXPIRED, HTTP_STATUS_UNAUTHORIZED};
 use crate::ext::status_code::StatusCodeExt;

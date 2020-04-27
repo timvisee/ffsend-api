@@ -1,6 +1,13 @@
 use std::time::Duration;
 
-use reqwest::{self, IntoUrl};
+use reqwest::{
+    self,
+    blocking::{
+        Client as ReqwestClient, ClientBuilder as ReqwestClientBuilder, Request as ReqwestRequest,
+        RequestBuilder as ReqwestRequestBuilder, Response as ReqwestResponse,
+    },
+    IntoUrl,
+};
 #[cfg(feature = "send3")]
 use websocket::{
     self, client::sync::Client as WsClient, result::WebSocketResult as WsResult,
@@ -17,7 +24,7 @@ pub struct Client {
     config: ClientConfig,
 
     /// The inner reqwest client.
-    reqwest: reqwest::Client,
+    reqwest: ReqwestClient,
 }
 
 impl Client {
@@ -27,7 +34,7 @@ impl Client {
     // TODO: properly handle errors, do not unwrap
     pub fn new(config: ClientConfig, transfer: bool) -> Self {
         // Set up the reqwest client
-        let mut builder = reqwest::ClientBuilder::new();
+        let mut builder = ReqwestClientBuilder::new();
         match config.timeout {
             Some(timeout) if !transfer => builder = builder.timeout(timeout),
             _ => {}
@@ -43,18 +50,18 @@ impl Client {
     }
 
     /// Create a HTTP GET request through this client, returning a `RequestBuilder`.
-    pub fn get<U: IntoUrl>(&self, url: U) -> reqwest::RequestBuilder {
+    pub fn get<U: IntoUrl>(&self, url: U) -> ReqwestRequestBuilder {
         self.configure(self.reqwest.get(url))
     }
 
     /// Create a HTTP GET request through this client, returning a `RequestBuilder`.
-    pub fn post<U: IntoUrl>(&self, url: U) -> reqwest::RequestBuilder {
+    pub fn post<U: IntoUrl>(&self, url: U) -> ReqwestRequestBuilder {
         self.configure(self.reqwest.post(url))
     }
 
     /// Execute the given reqwest request through the internal reqwest client.
     // TODO: remove this, as the timeout can't be configured?
-    pub fn execute(&self, request: reqwest::Request) -> reqwest::Result<reqwest::Response> {
+    pub fn execute(&self, request: ReqwestRequest) -> reqwest::Result<ReqwestResponse> {
         self.reqwest.execute(request)
     }
 
@@ -81,7 +88,7 @@ impl Client {
     }
 
     /// Configure the given reqwest client to match the configuration.
-    fn configure(&self, mut client: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
+    fn configure(&self, mut client: ReqwestRequestBuilder) -> ReqwestRequestBuilder {
         // Configure basic HTTP authentication
         if let Some((user, password)) = &self.config.basic_auth {
             client = client.basic_auth(user, password.to_owned());
@@ -95,16 +102,18 @@ impl Client {
 #[derive(Clone, Debug, Builder)]
 pub struct ClientConfig {
     /// Connection timeout for control requests.
+    #[builder(default = "Some(Duration::from_secs(30))")]
     timeout: Option<Duration>,
 
     /// Connection timeout specific to file transfers.
+    #[builder(default = "Some(Duration::from_secs(86400))")]
     transfer_timeout: Option<Duration>,
 
     /// Basic HTTP authentication credentials.
     ///
     /// Consists of a username, and an optional password.
+    #[builder(default)]
     basic_auth: Option<(String, Option<String>)>,
-
     // TODO: proxy settings
 }
 

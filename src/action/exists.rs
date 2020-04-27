@@ -28,7 +28,7 @@ impl<'a> Exists<'a> {
     fn check_exists(&self, client: &Client) -> Result<ExistsResponse, Error> {
         // Get the download url, and parse the nonce
         let exists_url = UrlBuilder::api_exists(self.file);
-        let mut response = client.get(exists_url).send().map_err(|_| Error::Request)?;
+        let response = client.get(exists_url).send().map_err(|_| Error::Request)?;
 
         // Ensure the status code is successful, check the expiry state
         match ensure_success(&response) {

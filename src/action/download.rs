@@ -3,8 +3,7 @@ use std::io::{self, Error as IoError, Read, Write};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use reqwest::header::AUTHORIZATION;
-use reqwest::Response;
+use reqwest::{blocking::Response, header::AUTHORIZATION};
 
 use super::metadata::{Error as MetadataError, Metadata as MetadataAction, MetadataResponse};
 use crate::api::request::{ensure_success, ResponseError};
@@ -74,7 +73,7 @@ impl<'a> Download<'a> {
     pub fn invoke(
         mut self,
         client: &Client,
-        reporter: Option<Arc<Mutex<ProgressReporter>>>,
+        reporter: Option<Arc<Mutex<dyn ProgressReporter>>>,
     ) -> Result<(), Error> {
         // Create a key set for the file
         let mut key = KeySet::from(self.file, self.password.as_ref());
@@ -191,7 +190,7 @@ impl<'a> Download<'a> {
         file: File,
         len: u64,
         key: &KeySet,
-        reporter: Option<Arc<Mutex<ProgressReporter>>>,
+        reporter: Option<Arc<Mutex<dyn ProgressReporter>>>,
     ) -> Result<impl Write, FileError> {
         // Build the decrypting file writer for the selected server API version
         let writer: Box<dyn Write> = match self.version {
@@ -225,7 +224,7 @@ impl<'a> Download<'a> {
         mut reader: R,
         mut writer: W,
         len: u64,
-        reporter: Option<Arc<Mutex<ProgressReporter>>>,
+        reporter: Option<Arc<Mutex<dyn ProgressReporter>>>,
     ) -> Result<(), DownloadError>
     where
         R: Read,

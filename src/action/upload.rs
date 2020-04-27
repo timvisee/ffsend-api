@@ -9,21 +9,24 @@ use std::sync::{Arc, Mutex};
 
 #[cfg(feature = "send2")]
 use self::mime::APPLICATION_OCTET_STREAM;
-use mime_guess::{guess_mime_type, Mime};
+use chrono::{DateTime, Duration, Utc};
+use mime_guess::{self, Mime};
+#[cfg(feature = "send2")]
+use reqwest::blocking::multipart::{Form, Part};
+#[cfg(feature = "send2")]
+use reqwest::blocking::Request;
 #[cfg(feature = "send2")]
 use reqwest::header::AUTHORIZATION;
-#[cfg(feature = "send2")]
-use reqwest::multipart::{Form, Part};
 use reqwest::Error as ReqwestError;
-#[cfg(feature = "send2")]
-use reqwest::Request;
 #[cfg(feature = "send3")]
 use serde_json;
 use url::{ParseError as UrlParseError, Url};
 #[cfg(feature = "send3")]
 use websocket::{result::WebSocketError, OwnedMessage};
 
-use super::params::{Error as ParamsError, Params, ParamsData};
+#[cfg(feature = "send2")]
+use super::params::Params;
+use super::params::{Error as ParamsError, ParamsData};
 use super::password::{Error as PasswordError, Password};
 #[cfg(feature = "send2")]
 use crate::api::nonce::header_nonce;
@@ -97,7 +100,7 @@ impl Upload {
     pub fn invoke(
         self,
         client: &Client,
-        reporter: Option<&Arc<Mutex<ProgressReporter>>>,
+        reporter: Option<&Arc<Mutex<dyn ProgressReporter>>>,
     ) -> Result<RemoteFile, Error> {
         // Create file data, generate a key
         let file = FileData::from(&self.path)?;
@@ -133,9 +136,21 @@ impl Upload {
             Password::new(&result, &password, nonce.clone()).invoke(client)?;
         }
 
-        // Change parameters if set
-        if let Some(params) = self.params {
-            Params::new(&result, params, nonce.clone()).invoke(client)?;
+        // Change parameters if any non-default, are already set with upload for Send v3
+        #[cfg(feature = "send2")]
+        {
+            #[allow(unreachable_patterns)]
+            match self.version {
+                Version::V2 => {
+                    if let Some(mut params) = self.params {
+                        params.normalize(self.version);
+                        if !params.is_empty() {
+                            Params::new(&result, params, nonce.clone()).invoke(client)?;
+                        }
+                    }
+                }
+                _ => {}
+            }
         }
 
         Ok(result)
@@ -163,15 +178,19 @@ impl Upload {
         let metadata = Metadata::from_send3(name, mime, file.size());
         let metadata = crypto::api::encrypt_metadata(metadata, key_set)?;
 
+        // Get the expiry time and donwload limit
+        let expiry = self.params.as_ref().and_then(|p| p.expiry_time);
+        let downloads = self.params.as_ref().and_then(|p| p.download_limit);
+
         // Build file info for this metadata and return it as JSON
-        Ok(FileInfo::from(None, None, metadata, key_set).to_json())
+        Ok(FileInfo::from(expiry, downloads, metadata, key_set).to_json())
     }
 
     /// Create a reader that reads the file as encrypted stream.
     fn create_reader(
         &self,
         key: &KeySet,
-        reporter: Option<Arc<Mutex<ProgressReporter>>>,
+        reporter: Option<Arc<Mutex<dyn ProgressReporter>>>,
     ) -> Result<Reader, Error> {
         // Open the file
         let file = match File::open(self.path.as_path()) {
@@ -271,7 +290,7 @@ impl Upload {
         key: &KeySet,
     ) -> Result<(RemoteFile, Option<Vec<u8>>), UploadError> {
         // Execute the request
-        let mut response = match client.execute(req) {
+        let response = match client.execute(req) {
             Ok(response) => response,
             // TODO: attach the error context
             Err(_) => return Err(UploadError::Request),
@@ -290,7 +309,7 @@ impl Upload {
         };
 
         // Transform the responce into a file object
-        Ok((response.into_file(self.host.clone(), &key)?, nonce))
+        Ok((response.into_file(self.host.clone(), &key, None)?, nonce))
     }
 
     /// Upload the file to the server, used in Firefox Send v3.
@@ -385,7 +404,14 @@ impl Upload {
         mem::drop(client);
 
         // Construct the remote file from the data we've obtained
-        let remote_file = upload_response.into_file(self.host.clone(), &key)?;
+        let remote_file = upload_response.into_file(
+            self.host.clone(),
+            &key,
+            self.params.as_ref().and_then(|p| {
+                p.expiry_time
+                    .map(|s| Utc::now() + Duration::seconds(s as i64))
+            }),
+        )?;
 
         Ok((remote_file, None))
     }
@@ -419,9 +445,16 @@ impl UploadResponse {
     /// Convert this response into a file object.
     ///
     /// The `host` and `key` must be given.
-    pub fn into_file(self, host: Url, key: &KeySet) -> Result<RemoteFile, UploadError> {
-        Ok(RemoteFile::new_now(
+    pub fn into_file(
+        self,
+        host: Url,
+        key: &KeySet,
+        expiry_time: Option<DateTime<Utc>>,
+    ) -> Result<RemoteFile, UploadError> {
+        Ok(RemoteFile::new(
             self.id,
+            Some(Utc::now()),
+            expiry_time,
             host,
             Url::parse(&self.url)?,
             key.secret().to_vec(),
@@ -480,7 +513,7 @@ impl<'a> FileData<'a> {
 
         Ok(Self {
             name,
-            mime: guess_mime_type(path),
+            mime: mime_guess::from_path(path).first_or_octet_stream(),
             size,
         })
     }

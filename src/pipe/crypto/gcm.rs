@@ -314,7 +314,7 @@ impl Read for GcmReader {
 
         // Move input buffer into the crypter
         let (read, out) = self.crypt.crypt(&self.buf_in);
-        self.buf_in.split_to(read);
+        let _ = self.buf_in.split_to(read);
 
         // Write any crypter output to given buffer and remaining to output buffer
         if let Some(out) = out {

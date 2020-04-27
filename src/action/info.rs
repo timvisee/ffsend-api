@@ -58,7 +58,7 @@ impl<'a> Info<'a> {
     ) -> Result<InfoResponse, Error> {
         // Get the info URL, and send the request
         let url = UrlBuilder::api_info(self.file);
-        let mut response = client
+        let response = client
             .post(url)
             .json(&data)
             .send()

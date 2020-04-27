@@ -4,7 +4,7 @@ use std::cmp::min;
 use std::io::{self, Read, Write};
 
 use byteorder::{BigEndian, ByteOrder};
-use bytes::{Bytes, BytesMut};
+use bytes::BytesMut;
 use openssl::symm;
 
 use super::{Crypt, CryptMode};
@@ -349,15 +349,15 @@ impl EceCrypt {
             "failed to decrypt, ECE header is not 21 bytes long",
         );
 
-        // Easily handle header data as bytes
-        let mut header = Bytes::from(header);
-
         // Parse the salt, record size and length
-        self.salt = Some(header.split_to(SALT_LEN).to_vec());
-        self.rs = BigEndian::read_u32(&header.split_to(RS_LEN));
+        let (salt, header) = header.split_at(SALT_LEN);
+        let (rs, header) = header.split_at(RS_LEN);
+        self.salt = Some(salt.to_vec());
+        self.rs = BigEndian::read_u32(rs);
 
         // Extracted in Send v3 code, but doesn't seem to be used
-        let key_id_len = header.split_to(1)[0] as usize;
+        let (key_id_data, header) = header.split_at(1);
+        let key_id_len = key_id_data[0] as usize;
         let _length = key_id_len + KEY_LEN + 5;
 
         // Derive the key and nonce based on extracted salt
@@ -367,7 +367,7 @@ impl EceCrypt {
         // If this fails, update `len_encrypted` as well
         assert!(
             header.is_empty(),
-            "failed to decrypt, not all ECE header bytes are used"
+            "failed to decrypt, not all ECE header bytes are used",
         );
     }
 
@@ -576,7 +576,7 @@ impl Read for EceReader {
 
         // Move input buffer into the crypter
         let (read, out) = self.crypt.crypt(&self.buf_in);
-        self.buf_in.split_to(read);
+        let _ = self.buf_in.split_to(read);
 
         // Write any crypter output to given buffer and remaining to output buffer
         if let Some(out) = out {

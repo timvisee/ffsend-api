@@ -6,6 +6,7 @@ stages:
   - release
   - trigger
 
+# Variable defaults
 variables:
   RUST_VERSION: stable
 
@@ -29,33 +30,31 @@ before_script:
     rustc --version
     cargo --version
 
-# Variable defaults
-variables:
-  RUST_VERSION: stable
-
 # Check on stable, beta and nightly 
 .check-base: &check-base
   stage: check
   script:
     - cargo check --verbose
-rust-stable:
+check-stable:
   <<: *check-base
-rust-beta:
+check-beta:
   <<: *check-base
   variables:
     RUST_VERSION: beta
-rust-nightly:
+check-nightly:
   <<: *check-base
   variables:
     RUST_VERSION: nightly
-rust-old:
+check-old:
   <<: *check-base
   variables:
-    RUST_VERSION: "1.32.0"
+    RUST_VERSION: "1.39.0"
 
 # Run the unit tests through Cargo
 cargo-test:
   stage: test
+  needs:
+    - check-stable
   dependencies: []
   script:
     # Test default configuration

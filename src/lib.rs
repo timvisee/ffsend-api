@@ -20,7 +20,6 @@ extern crate serde_derive;
 extern crate serde_json;
 extern crate time;
 pub extern crate url;
-pub extern crate url_serde;
 extern crate version_compare;
 #[cfg(feature = "send3")]
 extern crate websocket;
