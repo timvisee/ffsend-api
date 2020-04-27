@@ -61,7 +61,6 @@ cargo-test:
     - cargo test --verbose
 
     # Test different Send API versions
-    - cargo test --no-default-features --features send2,crypto-openssl
     - cargo test --no-default-features --features send3,crypto-openssl
 
     # Test different crypto backends

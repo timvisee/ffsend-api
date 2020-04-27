@@ -1,7 +1,7 @@
 #[cfg(feature = "crypto-openssl")]
 use openssl;
 #[cfg(feature = "crypto-ring")]
-use ring::aead;
+use ring::aead::{self, BoundKey};
 use serde_json;
 
 use crate::config::TAG_LEN;
@@ -62,30 +62,21 @@ fn encrypt_aead(key_set: &KeySet, plaintext: &[u8]) -> Result<Vec<u8>, Error> {
 
     #[cfg(feature = "crypto-ring")]
     {
-        // Own the plaintext buffer
+        // We need to own the buffer to seal in place, make room for appended tag
         let mut buf = plaintext.to_vec();
+        buf.append(&mut vec![0; TAG_LEN]);
 
-        // Allocate space for tag
-        // TODO: this can be improved!
-        buf.reserve(TAG_LEN);
-        for _ in 0..TAG_LEN {
-            buf.push(0);
-        }
+        // Prepare sealing key
+        let nonce = NonceOnce::from_slice(key_set.nonce());
+        let aad = aead::Aad::empty();
+        let unbound_key =
+            aead::UnboundKey::new(&aead::AES_128_GCM, key_set.meta_key().unwrap()).unwrap();
+        let mut key = aead::SealingKey::new(unbound_key, nonce);
 
-        // Encrypt the metadata
-        // TODO: do not unwrap here
-        let key = aead::SealingKey::new(&aead::AES_128_GCM, key_set.meta_key().unwrap()).unwrap();
-        let nonce = aead::Nonce::try_assume_unique_for_key(key_set.nonce()).unwrap();
-        let encrypted = aead::seal_in_place(&key, nonce, aead::Aad::empty(), &mut buf, TAG_LEN);
-
-        // Verify seal byte count, map data into actual payload
-        encrypted.map_err(|_| Error::Encrypt).and_then(|len| {
-            if len != buf.len() {
-                Err(Error::Encrypt)
-            } else {
-                Ok(buf)
-            }
-        })
+        // Seal in place, return sealed
+        key.seal_in_place_append_tag(aad, &mut buf)
+            .map_err(|_| Error::Encrypt)?;
+        Ok(buf.to_vec())
     }
 }
 
@@ -115,14 +106,26 @@ fn decrypt_aead(key_set: &KeySet, payload: &mut [u8]) -> Result<Vec<u8>, Error> 
 
     #[cfg(feature = "crypto-ring")]
     {
-        // TODO: do not unwrap here
-        let key = aead::OpeningKey::new(&aead::AES_128_GCM, key_set.meta_key().unwrap())
+        // Prepare opening key
+        let nonce = NonceOnce::from_slice(key_set.nonce());
+        let aad = aead::Aad::empty();
+        let unbound_key =
+            aead::UnboundKey::new(&aead::AES_128_GCM, key_set.meta_key().unwrap()).unwrap();
+        let mut key = aead::OpeningKey::new(unbound_key, nonce);
+
+        // TODO: remove this
+        let len_before = payload.len();
+
+        // Open in place
+        let out = key
+            .open_in_place(aad, payload)
             .map_err(|_| Error::Decrypt)?;
-        let nonce =
-            aead::Nonce::try_assume_unique_for_key(key_set.nonce()).map_err(|_| Error::Decrypt)?;
-        aead::open_in_place(&key, nonce, aead::Aad::empty(), 0, payload)
-            .map(|plaintext| plaintext.to_vec())
-            .map_err(|_| Error::Decrypt)
+
+        // TODO: remove this
+        eprintln!("DEBUG: in len: {}", len_before);
+        eprintln!("DEBUG: out len: {}", out.len());
+
+        Ok(out.to_vec())
     }
 }
 
@@ -166,4 +169,45 @@ pub enum Error {
     /// An error occurred while decrypting the given ciphertext.
     #[fail(display = "failed to decrypt given ciphertext")]
     Decrypt,
+}
+
+// --- TODO: clean stuff up below this line
+
+#[cfg(feature = "crypto-ring")]
+use aead::Nonce;
+#[cfg(feature = "crypto-ring")]
+use std::convert::TryInto;
+
+/// A static sequence nonce that doesn't advance.
+///
+/// On first `advance()` call, the nonce is returned. All subsequent calls will panic.
+#[cfg(feature = "crypto-ring")]
+struct NonceOnce([u8; 12], bool);
+
+#[cfg(feature = "crypto-ring")]
+impl NonceOnce {
+    /// Construct a new nonce.
+    pub fn new(nonce: [u8; 12]) -> Self {
+        Self(nonce, false)
+    }
+
+    /// Construct a nonce from the given slice.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the given nonce has an invalid size.
+    pub fn from_slice(nonce: &[u8]) -> Self {
+        Self::new(nonce.try_into().expect("nonce length must be 12 bytes"))
+    }
+}
+
+#[cfg(feature = "crypto-ring")]
+impl aead::NonceSequence for NonceOnce {
+    fn advance(&mut self) -> Result<Nonce, ring::error::Unspecified> {
+        if !self.1 {
+            Ok(Nonce::assume_unique_for_key(self.0))
+        } else {
+            Err(ring::error::Unspecified)
+        }
+    }
 }
