@@ -9,7 +9,7 @@ use self::sha2::Sha256;
 #[cfg(feature = "crypto-openssl")]
 use openssl::{hash::MessageDigest, pkcs5::pbkdf2_hmac};
 #[cfg(feature = "crypto-ring")]
-use ring::{digest, pbkdf2};
+use ring::pbkdf2;
 use url::Url;
 
 /// The length of the derived authentication key in bytes.
@@ -87,7 +87,7 @@ pub fn derive_auth_key(secret: &[u8], password: Option<&str>, url: Option<&Url>)
 
     #[cfg(feature = "crypto-ring")]
     pbkdf2::derive(
-        &digest::SHA256,
+        pbkdf2::PBKDF2_HMAC_SHA256,
         NonZeroU32::new(KEY_AUTH_ITERATIONS as u32)
             .expect("key authentication iteration count cannot be 0"),
         url.unwrap().as_str().as_bytes(),

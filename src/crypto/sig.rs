@@ -1,7 +1,7 @@
 #[cfg(feature = "crypto-openssl")]
 use openssl::{error::ErrorStack, hash::MessageDigest, pkey::PKey, sign::Signer};
 #[cfg(feature = "crypto-ring")]
-use ring::{digest, hmac};
+use ring::hmac;
 
 use super::b64;
 
@@ -26,7 +26,7 @@ fn signature_openssl(key: &[u8], data: &[u8]) -> Result<Vec<u8>, ErrorStack> {
 /// This is done using an HMAC key using the SHA256 digest.
 #[cfg(feature = "crypto-ring")]
 fn signature_ring(key: &[u8], data: &[u8]) -> Vec<u8> {
-    let skey = hmac::SigningKey::new(&digest::SHA256, key);
+    let skey = hmac::Key::new(hmac::HMAC_SHA256, key);
     hmac::sign(&skey, data).as_ref().to_owned()
 }
 

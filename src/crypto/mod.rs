@@ -11,9 +11,6 @@ pub use super::openssl::rand::rand_bytes;
 /// Cryptographically secure random bytes generator.
 #[cfg(feature = "crypto-ring")]
 pub fn rand_bytes(buf: &mut [u8]) -> Result<(), ring::error::Unspecified> {
-    use ring::{
-        self,
-        rand::{SecureRandom, SystemRandom},
-    };
+    use ring::rand::{SecureRandom, SystemRandom};
     SystemRandom::new().fill(buf)
 }
