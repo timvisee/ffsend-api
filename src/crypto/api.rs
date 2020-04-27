@@ -113,19 +113,11 @@ fn decrypt_aead(key_set: &KeySet, payload: &mut [u8]) -> Result<Vec<u8>, Error> 
             aead::UnboundKey::new(&aead::AES_128_GCM, key_set.meta_key().unwrap()).unwrap();
         let mut key = aead::OpeningKey::new(unbound_key, nonce);
 
-        // TODO: remove this
-        let len_before = payload.len();
-
-        // Open in place
-        let out = key
+        // Open in place and return data
+        Ok(key
             .open_in_place(aad, payload)
-            .map_err(|_| Error::Decrypt)?;
-
-        // TODO: remove this
-        eprintln!("DEBUG: in len: {}", len_before);
-        eprintln!("DEBUG: out len: {}", out.len());
-
-        Ok(out.to_vec())
+            .map_err(|_| Error::Decrypt)?
+            .to_vec())
     }
 }
 
