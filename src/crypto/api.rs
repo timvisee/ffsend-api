@@ -175,8 +175,9 @@ use std::convert::TryInto;
 /// A static sequence nonce that doesn't advance.
 ///
 /// On first `advance()` call, the nonce is returned. All subsequent calls will panic.
+// TODO: move this in global crypto place?
 #[cfg(feature = "crypto-ring")]
-struct NonceOnce([u8; 12], bool);
+pub(crate) struct NonceOnce([u8; 12], bool);
 
 #[cfg(feature = "crypto-ring")]
 impl NonceOnce {

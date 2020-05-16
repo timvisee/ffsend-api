@@ -1,5 +1,6 @@
 //! Provides pipes specific to cryptography.
 
+#[cfg(feature = "crypto-openssl")]
 use openssl::symm::Mode as OpenSslMode;
 
 #[cfg(feature = "send3")]
