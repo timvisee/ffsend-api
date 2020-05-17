@@ -9,7 +9,9 @@ use std::sync::{Arc, Mutex};
 
 #[cfg(feature = "send2")]
 use self::mime::APPLICATION_OCTET_STREAM;
-use chrono::{DateTime, Duration, Utc};
+#[cfg(feature = "send3")]
+use chrono::Duration;
+use chrono::{DateTime, Utc};
 use mime_guess::{self, Mime};
 #[cfg(feature = "send2")]
 use reqwest::blocking::multipart::{Form, Part};

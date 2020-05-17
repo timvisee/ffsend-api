@@ -5,7 +5,7 @@ use std::io::{self, Read, Write};
 
 use byteorder::{BigEndian, ByteOrder};
 use bytes::BytesMut;
-#[cfg(feature = "crypt-openssl")]
+#[cfg(feature = "crypto-openssl")]
 use openssl::symm;
 #[cfg(feature = "crypto-ring")]
 use ring::aead::{self, BoundKey};

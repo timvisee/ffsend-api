@@ -6,7 +6,7 @@ pub mod sig;
 
 // Re-export the cryptographically secure random bytes generator
 #[cfg(feature = "crypto-openssl")]
-pub use super::openssl::rand::rand_bytes;
+pub use openssl::rand::rand_bytes;
 
 /// Cryptographically secure random bytes generator.
 #[cfg(feature = "crypto-ring")]
