@@ -16,6 +16,7 @@ categories = [
     "network-programming",
 ]
 edition = "2018"
+build = "build.rs"
 
 [badges]
 gitlab = { repository = "timvisee/ffsend-api", branch = "master" }
