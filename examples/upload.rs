@@ -20,9 +20,14 @@ fn upload_file(path: PathBuf) -> Result<RemoteFile, Error> {
     let client_config = ClientConfigBuilder::default().build().unwrap();
     let client = client_config.client(true);
 
+    #[cfg(feature = "send3")]
+    let version = Version::V3;
+    #[cfg(not(feature = "send3"))]
+    let version = Version::V2;
+
     // Build upload action, and invoke to upload
     let upload = Upload::new(
-        Version::V3,
+        version,
         Url::parse("https://send.firefox.com/").unwrap(),
         path,
         None,

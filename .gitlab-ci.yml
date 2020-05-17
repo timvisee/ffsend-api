@@ -57,8 +57,14 @@ cargo-test:
     - check-stable
   dependencies: []
   script:
+    # Test default configuration
     - cargo test --verbose
-    - cargo test --no-default-features --features send3
+
+    # Test different Send API versions and crypto backends
+    - cargo test --no-default-features --features send3,crypto-ring
+    - cargo test --no-default-features --features send2,crypto-openssl
+    - cargo test --no-default-features --features send3,crypto-openssl
+    - cargo test --no-default-features --features send2,send3,crypto-openssl
 
 # Cargo crate release
 crate:

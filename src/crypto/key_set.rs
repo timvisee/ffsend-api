@@ -1,4 +1,3 @@
-use openssl::symm::Cipher;
 use url::Url;
 
 use super::hkdf::{derive_auth_key, derive_file_key, derive_meta_key};
@@ -7,14 +6,14 @@ use crate::api::url::UrlBuilder;
 use crate::file::remote_file::RemoteFile;
 
 /// The length of an input vector.
-const KEY_IV_LEN: usize = 12;
+const KEY_NONCE_LEN: usize = 12;
 
 pub struct KeySet {
     /// A secret.
     secret: Vec<u8>,
 
-    /// Input vector.
-    iv: [u8; KEY_IV_LEN],
+    /// Nonce.
+    nonce: [u8; KEY_NONCE_LEN],
 
     /// A derived file encryption key.
     file_key: Option<Vec<u8>>,
@@ -27,11 +26,11 @@ pub struct KeySet {
 }
 
 impl KeySet {
-    /// Construct a new key, with the given `secret` and `iv`.
-    pub fn new(secret: Vec<u8>, iv: [u8; 12]) -> Self {
+    /// Construct a new key, with the given `secret` and `nonce`.
+    pub fn new(secret: Vec<u8>, nonce: [u8; 12]) -> Self {
         Self {
             secret,
-            iv,
+            nonce,
             file_key: None,
             auth_key: None,
             meta_key: None,
@@ -106,14 +105,14 @@ impl KeySet {
         b64::encode(self.secret())
     }
 
-    /// Get the input vector.
-    pub fn iv(&self) -> &[u8] {
-        &self.iv
+    /// Get the nonce.
+    pub fn nonce(&self) -> &[u8] {
+        &self.nonce
     }
 
     /// Set the input vector.
-    pub fn set_iv(&mut self, iv: [u8; KEY_IV_LEN]) {
-        self.iv = iv;
+    pub fn set_nonce(&mut self, nonce: [u8; KEY_NONCE_LEN]) {
+        self.nonce = nonce;
     }
 
     /// Get the file encryption key, if derived.
@@ -135,10 +134,5 @@ impl KeySet {
     /// Get the metadata encryption key, if derived.
     pub fn meta_key(&self) -> Option<&Vec<u8>> {
         self.meta_key.as_ref()
-    }
-
-    /// Get the cipher type to use in combination with these keys.
-    pub fn cipher() -> Cipher {
-        Cipher::aes_128_gcm()
     }
 }

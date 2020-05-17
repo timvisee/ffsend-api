@@ -88,8 +88,8 @@ impl<'a> Download<'a> {
         };
 
         // Set the input vector if known, depending on the API version
-        if let Some(iv) = metadata.metadata().iv() {
-            key.set_iv(iv);
+        if let Some(nonce) = metadata.metadata().iv() {
+            key.set_nonce(nonce);
         }
 
         // Decide what actual file target to use
@@ -196,7 +196,7 @@ impl<'a> Download<'a> {
         let writer: Box<dyn Write> = match self.version {
             #[cfg(feature = "send2")]
             Version::V2 => {
-                let decrypt = GcmCrypt::decrypt(len as usize, key.file_key().unwrap(), key.iv());
+                let decrypt = GcmCrypt::decrypt(len as usize, key.file_key().unwrap(), key.nonce());
                 let writer = decrypt.writer(Box::new(file));
                 Box::new(writer)
             }

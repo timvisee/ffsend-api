@@ -5,12 +5,18 @@ use std::io::{self, Read, Write};
 
 use byteorder::{BigEndian, ByteOrder};
 use bytes::BytesMut;
+#[cfg(feature = "crypto-openssl")]
 use openssl::symm;
+#[cfg(feature = "crypto-ring")]
+use ring::aead::{self, BoundKey};
 
 use super::{Crypt, CryptMode};
 use crate::config::{self, TAG_LEN};
 use crate::crypto::{hkdf::hkdf, rand_bytes};
 use crate::pipe::{prelude::*, DEFAULT_BUF_SIZE};
+
+#[cfg(feature = "crypto-ring")]
+use crate::crypto::api::NonceOnce;
 
 /// The default record size in bytes to use for encryption.
 ///
@@ -235,26 +241,50 @@ impl EceCrypt {
         let read = plaintext.len();
         self.cur += read;
 
-        // Generate the encryption nonce, split ciphertext into payload and tag
+        // Generate the encryption nonce
         let nonce = self.generate_nonce(self.seq);
 
         // Pad the plaintext, encrypt the chunk, append tag
         pad(&mut plaintext, self.rs as usize, self.is_last());
-        let mut tag = vec![0u8; TAG_LEN];
-        let mut ciphertext = symm::encrypt_aead(
-            symm::Cipher::aes_128_gcm(),
-            self.key
-                .as_ref()
-                .expect("failed to encrypt ECE chunk, missing crypto key"),
-            Some(&nonce),
-            &[],
-            &plaintext,
-            &mut tag,
-        )
-        .expect("failed to encrypt ECE chunk");
-        ciphertext.extend_from_slice(&tag);
 
-        (read, Some(ciphertext))
+        #[cfg(feature = "crypto-openssl")]
+        {
+            // Encrypt the chunk, append tag
+            let mut tag = vec![0u8; TAG_LEN];
+            let mut ciphertext = symm::encrypt_aead(
+                symm::Cipher::aes_128_gcm(),
+                self.key
+                    .as_ref()
+                    .expect("failed to encrypt ECE chunk, missing crypto key"),
+                Some(&nonce),
+                &[],
+                &plaintext,
+                &mut tag,
+            )
+            .expect("failed to encrypt ECE chunk");
+            ciphertext.extend_from_slice(&tag);
+
+            (read, Some(ciphertext))
+        }
+
+        #[cfg(feature = "crypto-ring")]
+        {
+            // Prepare sealing key
+            let nonce = NonceOnce::from_slice(&nonce);
+            let aad = aead::Aad::empty();
+            let key = self
+                .key
+                .as_ref()
+                .expect("failed to encrypt ECE chunk, missing crypto key");
+            let unbound_key = aead::UnboundKey::new(&aead::AES_128_GCM, key).unwrap();
+            let mut key = aead::SealingKey::new(unbound_key, nonce);
+
+            // Seal in place, return sealed
+            key.seal_in_place_append_tag(aad, &mut plaintext)
+                .expect("failed to encrypt ECE chunk");
+
+            (read, Some(plaintext.to_vec()))
+        }
     }
 
     /// Decrypt the given `ciphertext` chunk using ECE crypto.
@@ -273,28 +303,61 @@ impl EceCrypt {
         //     panic!("could not write to AES-GCM decrypter, exceeding specified lenght");
         // }
 
-        // Generate the decryption nonce, split ciphertext into payload and tag
+        // Generate encryption nonce
         let nonce = self.generate_nonce(self.seq);
-        let (payload, tag) = ciphertext.split_at(ciphertext.len() - TAG_LEN);
 
-        // Decrypt the chunk, and unpad decrypted payload
-        let mut plaintext = symm::decrypt_aead(
-            symm::Cipher::aes_128_gcm(),
-            self.key
+        #[cfg(feature = "crypto-openssl")]
+        {
+            // Split payload and tag
+            let (payload, tag) = ciphertext.split_at(ciphertext.len() - TAG_LEN);
+
+            // Decrypt the chunk, and unpad decrypted payload
+            let mut plaintext = symm::decrypt_aead(
+                symm::Cipher::aes_128_gcm(),
+                self.key
+                    .as_ref()
+                    .expect("failed to decrypt ECE chunk, missing crypto key"),
+                Some(&nonce),
+                &[],
+                payload,
+                tag,
+            )
+            .expect("failed to decrypt ECE chunk");
+            unpad(&mut plaintext, self.is_last());
+
+            // Update transformed length
+            self.cur += plaintext.len();
+
+            (ciphertext.len(), Some(plaintext))
+        }
+
+        #[cfg(feature = "crypto-ring")]
+        {
+            // Clone ciphertext so we can modify in-place
+            let mut ciphertext = ciphertext.to_vec();
+
+            // Prepare opening key
+            let nonce = NonceOnce::from_slice(&nonce);
+            let aad = aead::Aad::empty();
+            let key = self
+                .key
                 .as_ref()
-                .expect("failed to decrypt ECE chunk, missing crypto key"),
-            Some(&nonce),
-            &[],
-            payload,
-            tag,
-        )
-        .expect("failed to decrypt ECE chunk");
-        unpad(&mut plaintext, self.is_last());
+                .expect("failed to decrypt ECE chunk, missing crypto key");
+            let unbound_key = aead::UnboundKey::new(&aead::AES_128_GCM, key).unwrap();
+            let mut key = aead::OpeningKey::new(unbound_key, nonce);
 
-        // Update transformed length
-        self.cur += plaintext.len();
+            // Decrypt the chunk, and unpad decrypted payload
+            let mut plaintext = key
+                .open_in_place(aad, &mut ciphertext)
+                .expect("failed to decrypt ECE chunk")
+                .to_vec();
+            unpad(&mut plaintext, self.is_last());
 
-        (ciphertext.len(), Some(plaintext))
+            // Update transformed length
+            self.cur += plaintext.len();
+
+            (ciphertext.len(), Some(plaintext))
+        }
     }
 
     /// Create the ECE crypto header.

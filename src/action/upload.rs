@@ -9,9 +9,10 @@ use std::sync::{Arc, Mutex};
 
 #[cfg(feature = "send2")]
 use self::mime::APPLICATION_OCTET_STREAM;
-use chrono::{DateTime, Duration, Utc};
+#[cfg(feature = "send3")]
+use chrono::Duration;
+use chrono::{DateTime, Utc};
 use mime_guess::{self, Mime};
-use openssl::symm::encrypt_aead;
 #[cfg(feature = "send2")]
 use reqwest::blocking::multipart::{Form, Part};
 #[cfg(feature = "send2")]
@@ -36,8 +37,7 @@ use crate::api::request::ensure_success;
 use crate::api::request::ResponseError;
 use crate::api::Version;
 use crate::client::Client;
-use crate::crypto::b64;
-use crate::crypto::key_set::KeySet;
+use crate::crypto::{self, api::MetadataError, key_set::KeySet};
 #[cfg(feature = "send3")]
 use crate::file::info::FileInfo;
 use crate::file::metadata::Metadata;
@@ -158,72 +158,34 @@ impl Upload {
         Ok(result)
     }
 
-    /// Create a blob of encrypted metadata, used in Firefox Send v2.
+    /// Create an encoded blob of encrypted metadata, used in Firefox Send v2.
     #[cfg(feature = "send2")]
-    fn create_metadata(&self, key: &KeySet, file: &FileData) -> Result<Vec<u8>, MetaError> {
+    fn create_metadata(&self, key_set: &KeySet, file: &FileData) -> Result<String, MetadataError> {
         // Determine what filename to use
         let name = self.name.clone().unwrap_or_else(|| file.name().to_owned());
 
-        // Construct the metadata
-        let metadata = Metadata::from_send2(key.iv(), name, &file.mime())
-            .to_json()
-            .into_bytes();
-
-        // Encrypt the metadata
-        let mut metadata_tag = vec![0u8; 16];
-        let mut metadata = match encrypt_aead(
-            KeySet::cipher(),
-            key.meta_key().unwrap(),
-            Some(&[0u8; 12]),
-            &[],
-            &metadata,
-            &mut metadata_tag,
-        ) {
-            Ok(metadata) => metadata,
-            Err(_) => return Err(MetaError::Encrypt),
-        };
-
-        // Append the encryption tag
-        metadata.append(&mut metadata_tag);
-
-        Ok(metadata)
+        // Construct the metadata, encrypt it
+        let metadata = Metadata::from_send2(key_set.nonce(), name, &file.mime());
+        crypto::api::encrypt_metadata(metadata, key_set)
     }
 
     /// Create file info to send to the server, used for Firefox Send v3.
     #[cfg(feature = "send3")]
-    fn create_file_info(&self, key: &KeySet, file: &FileData) -> Result<String, MetaError> {
+    fn create_file_info(&self, key_set: &KeySet, file: &FileData) -> Result<String, MetadataError> {
         // Determine what filename to use, build the metadata
         let name = self.name.clone().unwrap_or_else(|| file.name().to_owned());
 
-        // Construct the metadata
+        // Construct the metadata, encrypt it
         let mime = format!("{}", file.mime());
-        let metadata = Metadata::from_send3(name, mime, file.size())
-            .to_json()
-            .into_bytes();
-
-        // Encrypt the metadata
-        let mut metadata_tag = vec![0u8; 16];
-        let mut metadata = match encrypt_aead(
-            KeySet::cipher(),
-            key.meta_key().unwrap(),
-            Some(&[0u8; 12]),
-            &[],
-            &metadata,
-            &mut metadata_tag,
-        ) {
-            Ok(metadata) => metadata,
-            Err(_) => return Err(MetaError::Encrypt),
-        };
-
-        // Append the encryption tag
-        metadata.append(&mut metadata_tag);
+        let metadata = Metadata::from_send3(name, mime, file.size());
+        let metadata = crypto::api::encrypt_metadata(metadata, key_set)?;
 
         // Get the expiry time and donwload limit
         let expiry = self.params.as_ref().and_then(|p| p.expiry_time);
         let downloads = self.params.as_ref().and_then(|p| p.download_limit);
 
         // Build file info for this metadata and return it as JSON
-        Ok(FileInfo::from(expiry, downloads, b64::encode(&metadata), key).to_json())
+        Ok(FileInfo::from(expiry, downloads, metadata, key_set).to_json())
     }
 
     /// Create a reader that reads the file as encrypted stream.
@@ -252,7 +214,7 @@ impl Upload {
         match self.version {
             #[cfg(feature = "send2")]
             Version::V2 => {
-                let encrypt = GcmCrypt::encrypt(len as usize, key.file_key().unwrap(), key.iv());
+                let encrypt = GcmCrypt::encrypt(len as usize, key.file_key().unwrap(), key.nonce());
                 let reader = encrypt.reader(Box::new(reader));
                 Ok(Reader::new(Box::new(reader)))
             }
@@ -292,7 +254,7 @@ impl Upload {
         &self,
         client: &Client,
         key: &KeySet,
-        metadata: &[u8],
+        metadata: &str,
         reader: Reader,
     ) -> Result<Request, UploadError> {
         // Get the reader output length
@@ -314,7 +276,7 @@ impl Upload {
                 AUTHORIZATION.as_str(),
                 format!("send-v1 {}", key.auth_key_encoded().unwrap()),
             )
-            .header("X-File-Metadata", b64::encode(&metadata))
+            .header("X-File-Metadata", metadata)
             .multipart(form)
             .build()
             .map_err(|_| UploadError::Request)
@@ -629,8 +591,8 @@ pub enum Error {
     Password(#[cause] PasswordError),
 }
 
-impl From<MetaError> for Error {
-    fn from(err: MetaError) -> Error {
+impl From<MetadataError> for Error {
+    fn from(err: MetadataError) -> Error {
         Error::Prepare(PrepareError::Meta(err))
     }
 }
@@ -669,7 +631,7 @@ impl From<PasswordError> for Error {
 pub enum PrepareError {
     /// Failed to prepare the file metadata for uploading.
     #[fail(display = "failed to prepare file metadata")]
-    Meta(#[cause] MetaError),
+    Meta(#[cause] MetadataError),
 
     /// Failed to create an encrypted file reader, that encrypts
     /// the file on the fly when it is read.
@@ -679,13 +641,6 @@ pub enum PrepareError {
     /// Failed to create a client for uploading a file.
     #[fail(display = "failed to create uploader client")]
     Client,
-}
-
-#[derive(Fail, Debug)]
-pub enum MetaError {
-    /// An error occurred while encrypting the file metadata.
-    #[fail(display = "failed to encrypt file metadata")]
-    Encrypt,
 }
 
 #[derive(Fail, Debug)]

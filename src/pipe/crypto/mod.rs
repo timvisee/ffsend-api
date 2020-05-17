@@ -1,5 +1,6 @@
 //! Provides pipes specific to cryptography.
 
+#[cfg(feature = "crypto-openssl")]
 use openssl::symm::Mode as OpenSslMode;
 
 #[cfg(feature = "send3")]
@@ -30,6 +31,7 @@ pub enum CryptMode {
     Decrypt,
 }
 
+#[cfg(feature = "crypto-openssl")]
 impl Into<OpenSslMode> for CryptMode {
     fn into(self) -> OpenSslMode {
         match self {

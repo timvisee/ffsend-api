@@ -76,13 +76,13 @@ pub const TAG_LEN: usize = 16;
 pub const ECE_RECORD_SIZE: u32 = 1024 * 64;
 
 /// Get the maximum file upload size.
-pub fn upload_size_max(version: Version, auth: bool) -> u64 {
+pub fn upload_size_max(version: Version, _auth: bool) -> u64 {
     match version {
         #[cfg(feature = "send2")]
         Version::V2 => SEND2_MAX_UPLOAD_SIZE,
         #[cfg(feature = "send3")]
         Version::V3 => {
-            if auth {
+            if _auth {
                 SEND3_MAX_UPLOAD_SIZE_AUTH
             } else {
                 SEND3_MAX_UPLOAD_SIZE
@@ -94,13 +94,13 @@ pub fn upload_size_max(version: Version, auth: bool) -> u64 {
 /// Get supported maximum number of download values for a Send file.
 ///
 /// The remote server only accepts any of these specific values, and nothing in between.
-pub fn downloads_default(version: Version, auth: bool) -> usize {
+pub fn downloads_default(version: Version, _auth: bool) -> usize {
     match version {
         #[cfg(feature = "send2")]
         Version::V2 => SEND2_DEFAULT_DOWNLOADS,
         #[cfg(feature = "send3")]
         Version::V3 => {
-            if auth {
+            if _auth {
                 SEND3_DEFAULT_DOWNLOADS_AUTH
             } else {
                 SEND3_DEFAULT_DOWNLOADS
@@ -112,13 +112,13 @@ pub fn downloads_default(version: Version, auth: bool) -> usize {
 /// Get supported maximum number of download values for a Send file.
 ///
 /// The remote server only accepts any of these specific values, and nothing in between.
-pub fn downloads_max(version: Version, auth: bool) -> &'static [usize] {
+pub fn downloads_max(version: Version, _auth: bool) -> &'static [usize] {
     match version {
         #[cfg(feature = "send2")]
         Version::V2 => &SEND2_MAX_DOWNLOADS,
         #[cfg(feature = "send3")]
         Version::V3 => {
-            if auth {
+            if _auth {
                 &SEND3_MAX_DOWNLOADS_AUTH
             } else {
                 &SEND3_MAX_DOWNLOADS
@@ -130,13 +130,13 @@ pub fn downloads_max(version: Version, auth: bool) -> &'static [usize] {
 /// Get supported maximum file expiry time values in seconds for a Send file.
 ///
 /// The remote server only accepts any of these specific values, and nothing in between.
-pub fn expiry_max(version: Version, auth: bool) -> &'static [usize] {
+pub fn expiry_max(version: Version, _auth: bool) -> &'static [usize] {
     match version {
         #[cfg(feature = "send2")]
         Version::V2 => &SEND2_EXPIRY_MAX,
         #[cfg(feature = "send3")]
         Version::V3 => {
-            if auth {
+            if _auth {
                 &SEND3_EXPIRY_MAX_AUTH
             } else {
                 &SEND3_EXPIRY_MAX

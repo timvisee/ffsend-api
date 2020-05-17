@@ -1,10 +1,15 @@
 extern crate hkdf;
 extern crate sha2;
 
+#[cfg(feature = "crypto-ring")]
+use std::num::NonZeroU32;
+
 use self::hkdf::Hkdf;
 use self::sha2::Sha256;
-use openssl::hash::MessageDigest;
-use openssl::pkcs5::pbkdf2_hmac;
+#[cfg(feature = "crypto-openssl")]
+use openssl::{hash::MessageDigest, pkcs5::pbkdf2_hmac};
+#[cfg(feature = "crypto-ring")]
+use ring::pbkdf2;
 use url::Url;
 
 /// The length of the derived authentication key in bytes.
@@ -67,8 +72,10 @@ pub fn derive_auth_key(secret: &[u8], password: Option<&str>, url: Option<&Url>)
     }
 
     // Derive a key with a password and URL
-    // TODO: do not expect/unwrap here
     let mut key = vec![0u8; KEY_AUTH_SIZE];
+
+    // TODO: do not expect/unwrap here
+    #[cfg(feature = "crypto-openssl")]
     pbkdf2_hmac(
         password.unwrap().as_bytes(),
         url.unwrap().as_str().as_bytes(),
@@ -77,6 +84,16 @@ pub fn derive_auth_key(secret: &[u8], password: Option<&str>, url: Option<&Url>)
         &mut key,
     )
     .expect("failed to derive passworded authentication key");
+
+    #[cfg(feature = "crypto-ring")]
+    pbkdf2::derive(
+        pbkdf2::PBKDF2_HMAC_SHA256,
+        NonZeroU32::new(KEY_AUTH_ITERATIONS as u32)
+            .expect("key authentication iteration count cannot be 0"),
+        url.unwrap().as_str().as_bytes(),
+        password.unwrap().as_bytes(),
+        &mut key,
+    );
 
     key
 }
