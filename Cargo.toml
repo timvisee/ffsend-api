@@ -26,7 +26,7 @@ name = "ffsend_api"
 path = "src/lib.rs"
 
 [features]
-default = ["send2", "send3", "crypto-openssl"]
+default = ["send3", "crypto-ring"]
 
 # Support for Firefox Send v2
 send2 = []
@@ -34,14 +34,11 @@ send2 = []
 # Support for Firefox Send v3
 send3 = ["websocket"]
 
-# Crypt: openssl backend
-# TODO: stabilize feature name
+# Crypto: openssl backend
 crypto-openssl = ["openssl", "reqwest/default-tls"]
 
-# Crypt: ring backend
-# TODO: stabilize feature name
-# TODO: do not depend on openssl
-crypto-ring = ["openssl", "ring", "reqwest/rustls-tls"]
+# Crypto: ring backend
+crypto-ring = ["ring", "reqwest/rustls-tls"]
 
 [dependencies]
 arrayref = "0.3"

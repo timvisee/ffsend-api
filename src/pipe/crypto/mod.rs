@@ -31,7 +31,7 @@ pub enum CryptMode {
     Decrypt,
 }
 
-#[cfg(feature = "openssl")]
+#[cfg(feature = "crypto-openssl")]
 impl Into<OpenSslMode> for CryptMode {
     fn into(self) -> OpenSslMode {
         match self {

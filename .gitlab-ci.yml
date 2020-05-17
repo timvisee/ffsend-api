@@ -60,12 +60,11 @@ cargo-test:
     # Test default configuration
     - cargo test --verbose
 
-    # Test different Send API versions
+    # Test different Send API versions and crypto backends
+    - cargo test --no-default-features --features send3,crypto-ring
+    - cargo test --no-default-features --features send2,crypto-openssl
     - cargo test --no-default-features --features send3,crypto-openssl
-
-    # Test different crypto backends
     - cargo test --no-default-features --features send2,send3,crypto-openssl
-    - cargo test --no-default-features --features send2,send3,crypto-ring
 
 # Cargo crate release
 crate:
