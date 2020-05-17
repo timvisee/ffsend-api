@@ -8,15 +8,12 @@ use bytes::BytesMut;
 #[cfg(feature = "crypto-openssl")]
 use openssl::symm;
 #[cfg(feature = "crypto-ring")]
-use ring::aead::{self, BoundKey};
+use ring::aead;
 
 use super::{Crypt, CryptMode};
 use crate::config::{self, TAG_LEN};
 use crate::crypto::{hkdf::hkdf, rand_bytes};
 use crate::pipe::{prelude::*, DEFAULT_BUF_SIZE};
-
-#[cfg(feature = "crypto-ring")]
-use crate::crypto::api::NonceOnce;
 
 /// The default record size in bytes to use for encryption.
 ///
@@ -270,17 +267,18 @@ impl EceCrypt {
         #[cfg(feature = "crypto-ring")]
         {
             // Prepare sealing key
-            let nonce = NonceOnce::from_slice(&nonce);
+            let nonce = aead::Nonce::try_assume_unique_for_key(&nonce)
+                .expect("failed to encrypt ECE chunk, invalid nonce");
             let aad = aead::Aad::empty();
             let key = self
                 .key
                 .as_ref()
                 .expect("failed to encrypt ECE chunk, missing crypto key");
             let unbound_key = aead::UnboundKey::new(&aead::AES_128_GCM, key).unwrap();
-            let mut key = aead::SealingKey::new(unbound_key, nonce);
+            let key = aead::LessSafeKey::new(unbound_key);
 
             // Seal in place, return sealed
-            key.seal_in_place_append_tag(aad, &mut plaintext)
+            key.seal_in_place_append_tag(nonce, aad, &mut plaintext)
                 .expect("failed to encrypt ECE chunk");
 
             (read, Some(plaintext.to_vec()))
@@ -337,18 +335,19 @@ impl EceCrypt {
             let mut ciphertext = ciphertext.to_vec();
 
             // Prepare opening key
-            let nonce = NonceOnce::from_slice(&nonce);
+            let nonce = aead::Nonce::try_assume_unique_for_key(&nonce)
+                .expect("failed to decrypt ECE chunk, invalid nonce");
             let aad = aead::Aad::empty();
             let key = self
                 .key
                 .as_ref()
                 .expect("failed to decrypt ECE chunk, missing crypto key");
             let unbound_key = aead::UnboundKey::new(&aead::AES_128_GCM, key).unwrap();
-            let mut key = aead::OpeningKey::new(unbound_key, nonce);
+            let key = aead::LessSafeKey::new(unbound_key);
 
             // Decrypt the chunk, and unpad decrypted payload
             let mut plaintext = key
-                .open_in_place(aad, &mut ciphertext)
+                .open_in_place(nonce, aad, &mut ciphertext)
                 .expect("failed to decrypt ECE chunk")
                 .to_vec();
             unpad(&mut plaintext, self.is_last());
