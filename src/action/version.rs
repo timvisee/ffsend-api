@@ -60,11 +60,9 @@ impl Version {
         let response = client.get(version_url).send().map_err(|_| Error::Request)?;
 
         // Endpoint is removed since ~2020-07, assume V3
+        #[cfg(feature = "send3")]
         if response.status() == config::HTTP_STATUS_EXPIRED {
-            #[cfg(feature = "send3")]
             return Ok(api::Version::V3);
-            #[cfg(all(not(feature = "send3"), feature = "send2"))]
-            return Ok(api::Version::V2);
         }
 
         // Ensure the status code is successful
