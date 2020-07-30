@@ -61,8 +61,10 @@ impl Version {
 
         // Endpoint is removed since ~2020-07, assume V3
         #[cfg(feature = "send3")]
-        if response.status() == config::HTTP_STATUS_EXPIRED {
-            return Ok(api::Version::V3);
+        {
+            if response.status() == config::HTTP_STATUS_EXPIRED {
+                return Ok(api::Version::V3);
+            }
         }
 
         // Ensure the status code is successful
