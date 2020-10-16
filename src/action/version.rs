@@ -3,6 +3,7 @@ use url::Url;
 use crate::api;
 use crate::api::request::ensure_success;
 use crate::client::Client;
+use crate::config;
 
 /// The Firefox Send version data endpoint.
 const VERSION_ENDPOINT: &str = "__version__";
@@ -57,6 +58,14 @@ impl Version {
         // Build the version URL, request the version
         let version_url = self.host.join(VERSION_ENDPOINT).expect("invalid host");
         let response = client.get(version_url).send().map_err(|_| Error::Request)?;
+
+        // Endpoint is removed since ~2020-07, assume V3
+        #[cfg(feature = "send3")]
+        {
+            if response.status() == config::HTTP_STATUS_EXPIRED {
+                return Ok(api::Version::V3);
+            }
+        }
 
         // Ensure the status code is successful
         match ensure_success(&response) {
