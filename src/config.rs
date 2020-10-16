@@ -3,7 +3,7 @@ use reqwest::StatusCode;
 use crate::api::Version;
 
 /// The Send host to use by default.
-pub const SEND_DEFAULT_HOST: &str = "https://send.firefox.com/";
+pub const SEND_DEFAULT_HOST: &str = "https://send.vis.ee/";
 
 /// The default time after which uploaded files expire after, in seconds.
 pub const SEND_DEFAULT_EXPIRE_TIME: usize = 24 * 60 * 60;
@@ -15,7 +15,7 @@ pub const HTTP_STATUS_EXPIRED: StatusCode = StatusCode::NOT_FOUND;
 pub const HTTP_STATUS_UNAUTHORIZED: StatusCode = StatusCode::UNAUTHORIZED;
 
 /// The recommended maximum upload size in bytes.
-pub const UPLOAD_SIZE_MAX_RECOMMENDED: u64 = 1024 * 1024 * 1024;
+pub const UPLOAD_SIZE_MAX_RECOMMENDED: u64 = ((1024 * 1024 * 1024) as f64 * 2.5f64) as u64;
 
 /// The maximum upload size in bytes for Firefox Send v2.
 #[cfg(feature = "send2")]
@@ -23,11 +23,11 @@ const SEND2_MAX_UPLOAD_SIZE: u64 = 1024 * 1024 * 1024 * 2;
 
 /// The maximum upload size in bytes for Firefox Send v3 non-authenticated users.
 #[cfg(feature = "send3")]
-const SEND3_MAX_UPLOAD_SIZE: u64 = 1024 * 1024 * 1024;
+const SEND3_MAX_UPLOAD_SIZE: u64 = ((1024 * 1024 * 1024) as f64 * 2.5f64) as u64;
 
 /// The maximum upload size in bytes for Firefox Send v3 authenticated users.
 #[cfg(feature = "send3")]
-const SEND3_MAX_UPLOAD_SIZE_AUTH: u64 = ((1024 * 1024 * 1024) as f64 * 2.5f64) as u64;
+const SEND3_MAX_UPLOAD_SIZE_AUTH: u64 = SEND3_MAX_UPLOAD_SIZE;
 
 /// Default number of maximum downloads for a Send v2 file.
 #[cfg(feature = "send2")]
@@ -39,7 +39,7 @@ const SEND3_DEFAULT_DOWNLOADS: usize = 1;
 
 /// Default number of maximum downloads for a Send v3 file when authenticated.
 #[cfg(feature = "send3")]
-const SEND3_DEFAULT_DOWNLOADS_AUTH: usize = 20;
+const SEND3_DEFAULT_DOWNLOADS_AUTH: usize = SEND3_DEFAULT_DOWNLOADS;
 
 /// Supported maximum number of download values for a file for Firefox Send v2.
 #[cfg(feature = "send2")]
@@ -47,7 +47,7 @@ const SEND2_MAX_DOWNLOADS: [usize; 6] = [1, 2, 3, 4, 5, 20];
 
 /// Supported maximum number of download values for Firefox Send v3 non-authenticated users.
 #[cfg(feature = "send3")]
-const SEND3_MAX_DOWNLOADS: [usize; 1] = [1];
+const SEND3_MAX_DOWNLOADS: [usize; 6] = [1, 2, 3, 4, 5, 20];
 
 /// Supported maximum number of download values for Firefox Send v3 authenticated users.
 #[cfg(feature = "send3")]
@@ -63,11 +63,11 @@ const SEND2_EXPIRY_MAX: [usize; 1] = [86_400];
 /// Supported maximum file expiry time values in seconds for a file for Firefox Send v3 non-authenticated users.
 // TODO: use single biggest value, can use any expiry time now
 #[cfg(feature = "send3")]
-const SEND3_EXPIRY_MAX: [usize; 3] = [300, 3600, 86_400];
+const SEND3_EXPIRY_MAX: [usize; 4] = [300, 3600, 86_400, 604_800];
 
 /// Supported maximum file expiry time values in seconds for a file for Firefox Send v3 authenticated users.
 #[cfg(feature = "send3")]
-const SEND3_EXPIRY_MAX_AUTH: [usize; 4] = [300, 3600, 86_400, 604_800];
+const SEND3_EXPIRY_MAX_AUTH: [usize; 4] = SEND3_EXPIRY_MAX;
 
 /// The length of the tag in bytes we're using for cryptography.
 pub const TAG_LEN: usize = 16;
