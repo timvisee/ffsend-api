@@ -41,30 +41,30 @@ crypto-openssl = ["openssl", "reqwest/default-tls"]
 crypto-ring = ["ring", "reqwest/rustls-tls"]
 
 [dependencies]
-anyhow = "1.0.38" 
-arrayref = "0.3" 
-base64 = "0.12" 
-byteorder = "1.3" 
-bytes = "0.5" 
-chrono = { version = "0.4", features = ["serde"] } 
-derive_builder = "0.9" 
-hkdf = "0.8" 
-hyper = "^0.13" # same as reqwest
+anyhow = "1.0"
+arrayref = "0.3"
+base64 = "0.13"
+byteorder = "1.3"
+bytes = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+derive_builder = "0.9"
+hkdf = "0.10"
+hyper = "^0.14" # same as reqwest
 mime = "^0.3.7" # same as reqwest
-mime_guess = "2.0" 
-openssl = { version = "0.10", optional = true } 
-regex = "1.3" 
-reqwest = { version = "0.10.1", features = ["blocking", "json"] } 
-ring = { version = "0.16", optional = true } 
-serde = "1.0" 
-serde_derive = "1.0" 
-serde_json = "1.0" 
-sha2 = "0.8" 
-thiserror = "1.0.23" 
-time = "0.2" 
-url = { version = "2.1", features = ["serde"] } 
-version-compare = "0.0.10" 
-websocket = { version = "0.24", optional = true } 
+mime_guess = "2.0"
+openssl = { version = "0.10", optional = true }
+regex = "1.3"
+reqwest = { version = "0.11", features = ["blocking", "json"] }
+ring = { version = "0.16", optional = true }
+serde = "1.0"
+serde_derive = "1.0"
+serde_json = "1.0"
+sha2 = "0.9"
+thiserror = "1.0"
+time = "0.2"
+url = { version = "2.1", features = ["serde"] }
+version-compare = "0.0.11"
+websocket = { version = "0.26", optional = true }
 
 [package.metadata.docs.rs]
 targets = ["x86_64-unknown-linux-gnu"]
