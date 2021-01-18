@@ -2,6 +2,7 @@ use reqwest::{blocking::Response, StatusCode};
 
 use crate::config::{HTTP_STATUS_EXPIRED, HTTP_STATUS_UNAUTHORIZED};
 use crate::ext::status_code::StatusCodeExt;
+use crate::ThisError;
 
 /// Ensure the given response is successful. If it isn't, a corresponding `ResponseError` is returned.
 pub fn ensure_success(response: &Response) -> Result<(), ResponseError> {
@@ -27,22 +28,22 @@ pub fn ensure_success(response: &Response) -> Result<(), ResponseError> {
     Err(ResponseError::OtherHttp(status, status.err_text()))
 }
 
-#[derive(Fail, Debug)]
+#[derive(ThisError, Debug)]
 pub enum ResponseError {
     /// This request lead to an expired file, or a file that never existed.
-    #[fail(display = "this file has expired or did never exist")]
+    #[error("this file has expired or did never exist")]
     Expired,
 
     /// We were unauthorized to make this request.
     /// This is usually because of an incorrect password.
-    #[fail(display = "unauthorized, are the credentials correct?")]
+    #[error("unauthorized, are the credentials correct?")]
     Unauthorized,
 
     /// Some undefined error occurred with this response.
-    #[fail(display = "bad HTTP response: {}", _1)]
+    #[error("bad HTTP response: {}", _1)]
     OtherHttp(StatusCode, String),
 
     /// An undefined error message.
-    #[fail(display = "server responded with undefined error")]
+    #[error("server responded with undefined error")]
     Undefined,
 }

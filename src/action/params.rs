@@ -5,6 +5,7 @@ use crate::api::url::UrlBuilder;
 use crate::api::Version;
 use crate::client::Client;
 use crate::file::remote_file::RemoteFile;
+use crate::ThisError;
 
 /// The minimum allowed number of downloads, enforced by the server.
 // TODO: remove parameter, use from config
@@ -192,21 +193,21 @@ impl Default for ParamsData {
     }
 }
 
-#[derive(Fail, Debug)]
+#[derive(ThisError, Debug)]
 pub enum Error {
     /// An error occurred while preparing the action.
-    #[fail(display = "failed to prepare setting the parameters")]
-    Prepare(#[cause] PrepareError),
+    #[error("failed to prepare setting the parameters")]
+    Prepare(#[from] PrepareError),
 
     /// The given Send file has expired, or did never exist in the first place.
     /// Therefore the file could not be downloaded.
-    #[fail(display = "the file has expired or did never exist")]
+    #[error("the file has expired or did never exist")]
     Expired,
 
     /// An error has occurred while sending the parameter change request to
     /// the server.
-    #[fail(display = "failed to send the parameter change request")]
-    Change(#[cause] ChangeError),
+    #[error("failed to send the parameter change request")]
+    Change(#[from] ChangeError),
 }
 
 impl From<NonceError> for Error {
@@ -215,18 +216,6 @@ impl From<NonceError> for Error {
             NonceError::Expired => Error::Expired,
             err => Error::Prepare(PrepareError::Auth(err)),
         }
-    }
-}
-
-impl From<PrepareError> for Error {
-    fn from(err: PrepareError) -> Error {
-        Error::Prepare(err)
-    }
-}
-
-impl From<ChangeError> for Error {
-    fn from(err: ChangeError) -> Error {
-        Error::Change(err)
     }
 }
 
@@ -239,31 +228,31 @@ impl From<ResponseError> for Error {
     }
 }
 
-#[derive(Debug, Fail)]
+#[derive(Debug, ThisError)]
 pub enum ParamsDataError {
     /// The number of downloads is invalid, as it was out of the allowed
     /// bounds. See `PARAMS_DOWNLOAD_MIN` and `PARAMS_DOWNLOAD_MAX`.
     // TODO: use bound values from constants, don't hardcode them here
-    #[fail(display = "invalid number of downloads, must be between 1 and 20")]
+    #[error("invalid number of downloads, must be between 1 and 20")]
     DownloadBounds,
 
     /// Some error occurred while trying to wrap the parameter data in an
     /// owned object, which is required for authentication on the server.
     /// The wrapped error further described the problem.
-    #[fail(display = "")]
-    Owned(#[cause] DataError),
+    #[error("")]
+    Owned(#[from] DataError),
 }
 
-#[derive(Fail, Debug)]
+#[derive(ThisError, Debug)]
 pub enum PrepareError {
     /// Failed authenticating, needed to change the parameters.
-    #[fail(display = "failed to authenticate")]
-    Auth(#[cause] NonceError),
+    #[error("failed to authenticate")]
+    Auth(#[from] NonceError),
 
     /// An error occurred while building the parameter data that will be send
     /// to the server.
-    #[fail(display = "invalid parameters")]
-    ParamsData(#[cause] ParamsDataError),
+    #[error("invalid parameters")]
+    ParamsData(#[from] ParamsDataError),
 }
 
 impl From<DataError> for PrepareError {
@@ -272,13 +261,13 @@ impl From<DataError> for PrepareError {
     }
 }
 
-#[derive(Fail, Debug)]
+#[derive(ThisError, Debug)]
 pub enum ChangeError {
     /// Sending the request to change the parameters failed.
-    #[fail(display = "failed to send parameter change request")]
+    #[error("failed to send parameter change request")]
     Request,
 
     /// The server responded with an error while changing the file parameters.
-    #[fail(display = "bad response from server while changing parameters")]
-    Response(#[cause] ResponseError),
+    #[error("bad response from server while changing parameters")]
+    Response(#[from] ResponseError),
 }

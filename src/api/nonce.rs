@@ -7,6 +7,7 @@ use url::Url;
 use crate::api::request::{ensure_success, ResponseError};
 use crate::client::Client;
 use crate::crypto::b64;
+use crate::ThisError;
 
 /// The name of the header the nonce is delivered in.
 const HEADER_NONCE: HeaderName = WWW_AUTHENTICATE;
@@ -41,38 +42,29 @@ pub fn header_nonce(response: &Response) -> Result<Vec<u8>, NonceError> {
     .map_err(|_| NonceError::MalformedNonce)
 }
 
-#[derive(Fail, Debug)]
+#[derive(ThisError, Debug)]
 pub enum NonceError {
     /// Sending the request to fetch a nonce failed,
     /// as the file has expired or did never exist.
-    #[fail(display = "the file has expired or did never exist")]
+    #[error("the file has expired or did never exist")]
     Expired,
 
     /// Sending the request to fetch a nonce failed.
-    #[fail(display = "failed to request encryption nonce")]
+    #[error("failed to request encryption nonce")]
     Request,
 
     /// The server responded with an error while requesting the encryption nonce,
     /// required for some operations.
-    #[fail(display = "bad response from server while requesting encryption nonce")]
-    Response(#[cause] ResponseError),
+    #[error("bad response from server while requesting encryption nonce")]
+    Response(#[from] ResponseError),
 
     /// The nonce header was missing from the request.
-    #[fail(display = "missing nonce in server response")]
+    #[error("missing nonce in server response")]
     NoNonceHeader,
 
     /// The received nonce could not be parsed, because it was malformed.
     /// Maybe the server responded with a new format that isn't supported yet
     /// by this client.
-    #[fail(display = "received malformed nonce")]
+    #[error("received malformed nonce")]
     MalformedNonce,
-}
-
-impl From<ResponseError> for NonceError {
-    fn from(err: ResponseError) -> Self {
-        match err {
-            ResponseError::Expired => NonceError::Expired,
-            err => NonceError::Response(err),
-        }
-    }
 }

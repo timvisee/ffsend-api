@@ -8,6 +8,7 @@ use serde_json;
 use crate::config::TAG_LEN;
 use crate::crypto::{b64, key_set::KeySet};
 use crate::file::metadata::Metadata;
+use crate::ThisError;
 
 /// Encrypt the given `metadata` object.
 ///
@@ -124,44 +125,42 @@ fn decrypt_aead(key_set: &KeySet, payload: &mut [u8]) -> Result<Vec<u8>, Error> 
     }
 }
 
-#[derive(Fail, Debug)]
+#[derive(ThisError, Debug)]
 pub enum MetadataError {
     /// An error occurred while encrypting metadata.
-    #[fail(display = "failed to encrypt file metadata")]
-    Encrypt(#[cause] Error),
+    #[error("failed to encrypt file metadata")]
+    Encrypt(#[source] Error),
 
     /// An error occurred while decoding the metadata.
-    #[fail(display = "failed to decrypt file metadata")]
-    Decode(#[cause] b64::DecodeError),
+    #[error("failed to decrypt file metadata")]
+    Decode(#[from] b64::DecodeError),
 
     /// An error occurred while decrypting metadata.
-    #[fail(display = "failed to decrypt file metadata")]
-    Decrypt(#[cause] Error),
+    #[error("failed to decrypt file metadata")]
+    Decrypt(#[source] Error),
 
     /// An error occurred while parsing the decrypted metadata.
-    #[fail(display = "failed to parse decrypted file metadata")]
-    Parse(#[cause] serde_json::Error),
+    #[error("failed to parse decrypted file metadata")]
+    Parse(#[from] serde_json::Error),
 }
 
-impl From<b64::DecodeError> for MetadataError {
-    fn from(err: b64::DecodeError) -> Self {
-        MetadataError::Decode(err)
+impl From<Error> for MetadataError {
+    fn from(e: Error) -> Self {
+        match e {
+            Error::Encrypt => Self::Encrypt(e),
+            Error::Decrypt => Self::Decrypt(e),
+        }
     }
 }
 
-impl From<serde_json::Error> for MetadataError {
-    fn from(err: serde_json::Error) -> Self {
-        MetadataError::Parse(err)
-    }
-}
 
-#[derive(Fail, Debug)]
+#[derive(ThisError, Debug)]
 pub enum Error {
     /// An error occurred while decrypting the given plaintext.
-    #[fail(display = "failed to encrypt given plaintext")]
+    #[error("failed to encrypt given plaintext")]
     Encrypt,
 
     /// An error occurred while decrypting the given ciphertext.
-    #[fail(display = "failed to decrypt given ciphertext")]
+    #[error("failed to decrypt given ciphertext")]
     Decrypt,
 }
