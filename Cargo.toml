@@ -1,6 +1,6 @@
 [package]
 name = "ffsend-api"
-version = "0.7.1"
+version = "0.7.0"
 authors = ["Tim Visee <3a4fb3964f@sinenomine.email>"]
 license = "MIT"
 readme = "README.md"
@@ -29,7 +29,7 @@ path = "src/lib.rs"
 default = ["send3", "crypto-ring"]
 
 # Support for Firefox Send v2
-send2 = []
+send2 = ["reqwest/multipart"]
 
 # Support for Firefox Send v3
 send3 = ["websocket"]

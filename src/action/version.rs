@@ -3,6 +3,7 @@ use url::Url;
 use crate::api;
 use crate::api::request::ensure_success;
 use crate::client::Client;
+#[cfg(feature = "send3")]
 use crate::config;
 use crate::ThisError;
 
