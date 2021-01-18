@@ -5,6 +5,7 @@ use crate::api::url::UrlBuilder;
 use crate::client::Client;
 use crate::crypto::key_set::KeySet;
 use crate::file::remote_file::RemoteFile;
+use crate::ThisError;
 
 /// An action to change a password of an uploaded Send file.
 ///
@@ -93,21 +94,21 @@ impl PasswordData {
     }
 }
 
-#[derive(Fail, Debug)]
+#[derive(ThisError, Debug)]
 pub enum Error {
     /// An error occurred while preparing the action.
-    #[fail(display = "failed to prepare setting the password")]
-    Prepare(#[cause] PrepareError),
+    #[error("failed to prepare setting the password")]
+    Prepare(#[from] PrepareError),
 
     /// The given Send file has expired, or did never exist in the first place.
     /// Therefore the file could not be downloaded.
-    #[fail(display = "the file has expired or did never exist")]
+    #[error("the file has expired or did never exist")]
     Expired,
 
     /// An error has occurred while sending the password change request to
     /// the server.
-    #[fail(display = "failed to send the password change request")]
-    Change(#[cause] ChangeError),
+    #[error("failed to send the password change request")]
+    Change(#[from] ChangeError),
 }
 
 impl From<NonceError> for Error {
@@ -116,18 +117,6 @@ impl From<NonceError> for Error {
             NonceError::Expired => Error::Expired,
             err => Error::Prepare(PrepareError::Auth(err)),
         }
-    }
-}
-
-impl From<PrepareError> for Error {
-    fn from(err: PrepareError) -> Error {
-        Error::Prepare(err)
-    }
-}
-
-impl From<ChangeError> for Error {
-    fn from(err: ChangeError) -> Error {
-        Error::Change(err)
     }
 }
 
@@ -140,32 +129,26 @@ impl From<ResponseError> for Error {
     }
 }
 
-#[derive(Fail, Debug)]
+#[derive(ThisError, Debug)]
 pub enum PrepareError {
     /// Failed authenticating, needed to set a new password.
-    #[fail(display = "failed to authenticate")]
-    Auth(#[cause] NonceError),
+    #[error("failed to authenticate")]
+    Auth(#[from] NonceError),
 
     /// Some error occurred while building the data that will be sent.
     /// The owner token might possibly be missing, the wrapped error will
     /// describe this further.
-    #[fail(display = "")]
-    Data(#[cause] DataError),
+    #[error("")]
+    Data(#[from] DataError),
 }
 
-impl From<DataError> for PrepareError {
-    fn from(err: DataError) -> PrepareError {
-        PrepareError::Data(err)
-    }
-}
-
-#[derive(Fail, Debug)]
+#[derive(ThisError, Debug)]
 pub enum ChangeError {
     /// Sending the request to change the password failed.
-    #[fail(display = "failed to send password change request")]
+    #[error("failed to send password change request")]
     Request,
 
     /// The server responded with an error while changing the file password.
-    #[fail(display = "bad response from server while changing password")]
-    Response(#[cause] ResponseError),
+    #[error("bad response from server while changing password")]
+    Response(#[from] ResponseError),
 }

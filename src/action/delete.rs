@@ -4,6 +4,7 @@ use crate::api::request::{ensure_success, ResponseError};
 use crate::api::url::UrlBuilder;
 use crate::client::Client;
 use crate::file::remote_file::RemoteFile;
+use crate::ThisError;
 
 /// An action to delete a remote file.
 ///
@@ -74,20 +75,20 @@ impl DeleteData {
     }
 }
 
-#[derive(Fail, Debug)]
+#[derive(ThisError, Debug)]
 pub enum Error {
     /// An error occurred while preparing the action.
-    #[fail(display = "failed to prepare the action")]
-    Prepare(#[cause] PrepareError),
+    #[error("failed to prepare the action")]
+    Prepare(#[from] PrepareError),
 
     /// The given Send file has expired, or did never exist in the first place.
     /// Therefore the file could not be downloaded.
-    #[fail(display = "the file has expired or did never exist")]
+    #[error("the file has expired or did never exist")]
     Expired,
 
     /// An error has occurred while sending the file deletion request.
-    #[fail(display = "failed to send the file deletion request")]
-    Delete(#[cause] DeleteError),
+    #[error("failed to send the file deletion request")]
+    Delete(#[from] DeleteError),
 }
 
 impl From<NonceError> for Error {
@@ -99,48 +100,36 @@ impl From<NonceError> for Error {
     }
 }
 
-impl From<PrepareError> for Error {
-    fn from(err: PrepareError) -> Error {
-        Error::Prepare(err)
-    }
-}
-
-impl From<DeleteError> for Error {
-    fn from(err: DeleteError) -> Error {
-        Error::Delete(err)
-    }
-}
-
-#[derive(Debug, Fail)]
+#[derive(Debug, ThisError)]
 pub enum DeleteDataError {
     /// Some error occurred while trying to wrap the deletion data in an
     /// owned object, which is required for authentication on the server.
     /// The wrapped error further described the problem.
-    #[fail(display = "")]
-    Owned(#[cause] DataError),
+    #[error("")]
+    Owned(#[from] DataError),
 }
 
-#[derive(Fail, Debug)]
+#[derive(ThisError, Debug)]
 pub enum PrepareError {
     /// Failed to authenticate
-    #[fail(display = "failed to authenticate")]
-    Auth(#[cause] NonceError),
+    #[error("failed to authenticate")]
+    Auth(#[from] NonceError),
 
     /// An error occurred while building the deletion data that will be
     /// send to the server.
-    #[fail(display = "invalid parameters")]
-    DeleteData(#[cause] DeleteDataError),
+    #[error("invalid parameters")]
+    DeleteData(#[from] DeleteDataError),
 }
 
-#[derive(Fail, Debug)]
+#[derive(ThisError, Debug)]
 pub enum DeleteError {
     /// Sending the file deletion request failed.
-    #[fail(display = "failed to send file deletion request")]
+    #[error("failed to send file deletion request")]
     Request,
 
     /// The server responded with an error while requesting file deletion.
-    #[fail(display = "bad response from server while deleting file")]
-    Response(#[cause] ResponseError),
+    #[error("bad response from server while deleting file")]
+    Response(#[from] ResponseError),
 }
 
 impl From<ResponseError> for Error {

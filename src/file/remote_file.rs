@@ -8,6 +8,7 @@ use url::{ParseError as UrlParseError, Url};
 use crate::api::url::UrlBuilder;
 use crate::config::SEND_DEFAULT_EXPIRE_TIME;
 use crate::crypto::b64;
+use crate::ThisError;
 
 /// A pattern for share URL paths, capturing the file ID.
 // TODO: match any sub-path?
@@ -308,17 +309,17 @@ impl RemoteFile {
     }
 }
 
-#[derive(Debug, Fail)]
+#[derive(Debug, ThisError)]
 pub enum FileParseError {
     /// An URL format error.
-    #[fail(display = "failed to parse remote file, invalid URL format")]
-    UrlFormatError(#[cause] UrlParseError),
+    #[error("failed to parse remote file, invalid URL format")]
+    UrlFormatError(#[from] UrlParseError),
 
     /// An error for an invalid share URL format.
-    #[fail(display = "failed to parse remote file, invalid URL")]
+    #[error("failed to parse remote file, invalid URL")]
     InvalidUrl,
 
     /// An error for an invalid secret format, if an URL fragmet exists.
-    #[fail(display = "failed to parse remote file, invalid secret in URL")]
+    #[error("failed to parse remote file, invalid secret in URL")]
     InvalidSecret,
 }

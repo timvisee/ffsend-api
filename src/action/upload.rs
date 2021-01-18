@@ -52,6 +52,7 @@ use crate::pipe::{
     prelude::*,
     progress::{ProgressPipe, ProgressReporter},
 };
+use crate::ThisError;
 
 /// A file upload action to a Send server.
 ///
@@ -566,40 +567,34 @@ impl PipeLen for Reader {
     }
 }
 
-#[derive(Fail, Debug)]
+#[derive(ThisError, Debug)]
 pub enum Error {
     /// An error occurred while preparing a file for uploading.
-    #[fail(display = "failed to prepare uploading the file")]
-    Prepare(#[cause] PrepareError),
+    #[error("failed to prepare uploading the file")]
+    Prepare(#[from] PrepareError),
 
     /// An error occurred while opening, reading or using the file that
     /// the should be uploaded.
     // TODO: maybe append the file path here for further information
-    #[fail(display = "")]
-    File(#[cause] FileError),
+    #[error("")]
+    File(#[from] FileError),
 
     /// An error occurred while uploading the file.
-    #[fail(display = "failed to upload the file")]
-    Upload(#[cause] UploadError),
+    #[error("failed to upload the file")]
+    Upload(#[from] UploadError),
 
     /// An error occurred while chaining file parameters.
-    #[fail(display = "failed to change file parameters")]
-    Params(#[cause] ParamsError),
+    #[error("failed to change file parameters")]
+    Params(#[from] ParamsError),
 
     /// An error occurred while setting the password.
-    #[fail(display = "failed to set the password")]
-    Password(#[cause] PasswordError),
+    #[error("failed to set the password")]
+    Password(#[from] PasswordError),
 }
 
 impl From<MetadataError> for Error {
     fn from(err: MetadataError) -> Error {
         Error::Prepare(PrepareError::Meta(err))
-    }
-}
-
-impl From<FileError> for Error {
-    fn from(err: FileError) -> Error {
-        Error::File(err)
     }
 }
 
@@ -609,120 +604,77 @@ impl From<ReaderError> for Error {
     }
 }
 
-impl From<UploadError> for Error {
-    fn from(err: UploadError) -> Error {
-        Error::Upload(err)
-    }
-}
-
-impl From<ParamsError> for Error {
-    fn from(err: ParamsError) -> Error {
-        Error::Params(err)
-    }
-}
-
-impl From<PasswordError> for Error {
-    fn from(err: PasswordError) -> Error {
-        Error::Password(err)
-    }
-}
-
-#[derive(Fail, Debug)]
+#[derive(ThisError, Debug)]
 pub enum PrepareError {
     /// Failed to prepare the file metadata for uploading.
-    #[fail(display = "failed to prepare file metadata")]
-    Meta(#[cause] MetadataError),
+    #[error("failed to prepare file metadata")]
+    Meta(#[from] MetadataError),
 
     /// Failed to create an encrypted file reader, that encrypts
     /// the file on the fly when it is read.
-    #[fail(display = "failed to access the file to upload")]
-    Reader(#[cause] ReaderError),
+    #[error("failed to access the file to upload")]
+    Reader(#[from] ReaderError),
 
     /// Failed to create a client for uploading a file.
-    #[fail(display = "failed to create uploader client")]
+    #[error("failed to create uploader client")]
     Client,
 }
 
-#[derive(Fail, Debug)]
+#[derive(ThisError, Debug)]
 pub enum ReaderError {
     /// An error occurred while creating the file encryptor.
-    #[fail(display = "failed to create file encryptor")]
+    #[error("failed to create file encryptor")]
     Encrypt,
 
     /// Failed to create the progress reader, attached to the file reader,
     /// to measure the uploading progress.
-    #[fail(display = "failed to create progress reader")]
+    #[error("failed to create progress reader")]
     Progress,
 }
 
-#[derive(Fail, Debug)]
+#[derive(ThisError, Debug)]
 pub enum FileError {
     /// The given path, is not not a file or doesn't exist.
-    #[fail(display = "the given path is not an existing file")]
+    #[error("the given path is not an existing file")]
     NotAFile,
 
     /// Failed to open the file that must be uploaded for reading.
-    #[fail(display = "failed to open the file to upload")]
-    Open(#[cause] IoError),
+    #[error("failed to open the file to upload")]
+    Open(#[from] IoError),
 }
 
-impl From<IoError> for FileError {
-    fn from(err: IoError) -> FileError {
-        FileError::Open(err)
-    }
-}
-
-#[derive(Fail, Debug)]
+#[derive(ThisError, Debug)]
 pub enum UploadError {
     /// Failed to start or update the uploading progress, because of this the
     /// upload can't continue.
-    #[fail(display = "failed to update upload progress")]
+    #[error("failed to update upload progress")]
     Progress,
 
     /// Sending the request to upload the file failed.
-    #[fail(display = "failed to request file upload")]
+    #[error("failed to request file upload")]
     Request,
 
     /// An error occurred while streaming the encrypted file (including file info, header and
     /// footer) for uploading over a websocket.
-    #[fail(display = "failed to stream file for upload over websocket")]
+    #[error("failed to stream file for upload over websocket")]
     #[cfg(feature = "send3")]
-    UploadStream(#[cause] WebSocketError),
+    UploadStream(#[from] WebSocketError),
 
     /// The server responded with data that was not understood, or did not respond at all while a
     /// response was espected.
-    #[fail(display = "got invalid response from server")]
+    #[error("got invalid response from server")]
     InvalidResponse,
 
     /// The server responded with an error for uploading.
-    #[fail(display = "bad response from server for uploading")]
-    Response(#[cause] ResponseError),
+    #[error("bad response from server for uploading")]
+    Response(#[from] ResponseError),
 
     /// Failed to decode the upload response from the server.
     /// Maybe the server responded with data from a newer API version.
-    #[fail(display = "failed to decode upload response")]
-    Decode(#[cause] ReqwestError),
+    #[error("failed to decode upload response")]
+    Decode(#[from] ReqwestError),
 
     /// Failed to parse the retrieved URL from the upload response.
-    #[fail(display = "failed to parse received URL")]
-    ParseUrl(#[cause] UrlParseError),
-}
-
-#[cfg(feature = "send3")]
-impl From<WebSocketError> for UploadError {
-    fn from(err: WebSocketError) -> UploadError {
-        UploadError::UploadStream(err)
-    }
-}
-
-impl From<ResponseError> for UploadError {
-    fn from(err: ResponseError) -> UploadError {
-        UploadError::Response(err)
-    }
-}
-
-impl From<UrlParseError> for UploadError {
-    fn from(err: UrlParseError) -> UploadError {
-        UploadError::ParseUrl(err)
-    }
+    #[error("failed to parse received URL")]
+    ParseUrl(#[from] UrlParseError),
 }

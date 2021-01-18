@@ -1,4 +1,3 @@
-use failure::Error as FailureError;
 use reqwest::header::AUTHORIZATION;
 use serde::{
     de::{Error as SerdeError, Unexpected},
@@ -11,11 +10,12 @@ use crate::api::nonce::{header_nonce, request_nonce, NonceError};
 use crate::api::request::{ensure_success, ResponseError};
 use crate::api::url::UrlBuilder;
 use crate::client::Client;
-use crate::crypto::{self, api::MetadataError};
 use crate::crypto::key_set::KeySet;
 use crate::crypto::sig::signature_encoded;
+use crate::crypto::{self, api::MetadataError};
 use crate::file::metadata::Metadata as MetadataData;
 use crate::file::remote_file::RemoteFile;
+use crate::ThisError;
 
 /// An action to fetch file metadata.
 ///
@@ -234,7 +234,7 @@ impl<'a> MetadataResponse {
         raw: &RawMetadataResponse,
         key_set: &KeySet,
         nonce: Vec<u8>,
-    ) -> Result<Self, FailureError> {
+    ) -> Result<Self, MetadataError> {
         Ok(Self::new(raw.decrypt_metadata(key_set)?, raw.size(), nonce))
     }
 
@@ -256,39 +256,27 @@ impl<'a> MetadataResponse {
     }
 }
 
-#[derive(Fail, Debug)]
+#[derive(ThisError, Debug)]
 pub enum Error {
     /// An error occurred while checking whether the file exists on the
     /// server.
-    #[fail(display = "failed to check whether the file exists")]
-    Exists(#[cause] ExistsError),
+    #[error("failed to check whether the file exists")]
+    Exists(#[from] ExistsError),
 
     /// A general error occurred while requesting the file data.
     /// This may be because authentication failed, because decrypting the
     /// file metadata didn't succeed, or due to some other reason.
-    #[fail(display = "failed to request file data")]
-    Request(#[cause] RequestError),
+    #[error("failed to request file data")]
+    Request(#[from] RequestError),
 
     /// The given Send file has expired, or did never exist in the first place.
     /// Therefore the file could not be downloaded.
-    #[fail(display = "the file has expired or did never exist")]
+    #[error("the file has expired or did never exist")]
     Expired,
 
     /// A password is required, but was not given.
-    #[fail(display = "missing password, password required")]
+    #[error("missing password, password required")]
     PasswordRequired,
-}
-
-impl From<ExistsError> for Error {
-    fn from(err: ExistsError) -> Error {
-        Error::Exists(err)
-    }
-}
-
-impl From<RequestError> for Error {
-    fn from(err: RequestError) -> Error {
-        Error::Request(err)
-    }
 }
 
 impl From<MetaError> for Error {
@@ -306,43 +294,43 @@ impl From<NonceError> for Error {
     }
 }
 
-#[derive(Fail, Debug)]
+#[derive(ThisError, Debug)]
 pub enum RequestError {
     /// Failed authenticating, in order to fetch the file data.
-    #[fail(display = "failed to authenticate")]
-    Auth(#[cause] NonceError),
+    #[error("failed to authenticate")]
+    Auth(#[from] NonceError),
 
     /// Failed to retrieve the file metadata.
-    #[fail(display = "failed to retrieve file metadata")]
-    Meta(#[cause] MetaError),
+    #[error("failed to retrieve file metadata")]
+    Meta(#[from] MetaError),
 }
 
-#[derive(Fail, Debug)]
+#[derive(ThisError, Debug)]
 pub enum MetaError {
     /// An error occurred while computing the cryptographic signature used for
     /// decryption.
-    #[fail(display = "failed to compute cryptographic signature")]
+    #[error("failed to compute cryptographic signature")]
     ComputeSignature,
 
     /// Sending the request to gather the metadata encryption nonce failed.
-    #[fail(display = "failed to request metadata nonce")]
+    #[error("failed to request metadata nonce")]
     NonceRequest,
 
     /// The server responded with an error while fetching the metadata
     /// encryption nonce.
-    #[fail(display = "bad response from server while fetching metadata nonce")]
-    NonceResponse(#[cause] ResponseError),
+    #[error("bad response from server while fetching metadata nonce")]
+    NonceResponse(#[from] ResponseError),
 
     /// Couldn't parse the metadata encryption nonce.
-    #[fail(display = "failed to parse the metadata encryption nonce")]
-    Nonce(#[cause] NonceError),
+    #[error("failed to parse the metadata encryption nonce")]
+    Nonce(#[from] NonceError),
 
     /// The received metadata is malformed, and couldn't be decoded or
     /// interpreted.
-    #[fail(display = "received malformed metadata")]
+    #[error("received malformed metadata")]
     Malformed,
 
     /// Failed to decrypt the received metadata.
-    #[fail(display = "failed to decrypt received metadata")]
+    #[error("failed to decrypt received metadata")]
     Decrypt,
 }

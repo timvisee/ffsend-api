@@ -2,6 +2,7 @@ use crate::api::request::{ensure_success, ResponseError};
 use crate::api::url::UrlBuilder;
 use crate::client::Client;
 use crate::file::remote_file::RemoteFile;
+use crate::ThisError;
 
 /// An action to check whether a remote file exists.
 /// This aciton returns an `ExistsResponse`, that defines whether the file
@@ -102,21 +103,21 @@ impl Default for ExistsResponse {
     }
 }
 
-#[derive(Fail, Debug)]
+#[derive(ThisError, Debug)]
 pub enum Error {
     /// Sending the request to check whether the file exists failed.
-    #[fail(display = "failed to send request whether the file exists")]
+    #[error("failed to send request whether the file exists")]
     Request,
 
     /// The server responded with an error while checking whether the file
     /// exists.
-    #[fail(display = "bad response from server while checking file existence")]
-    Response(#[cause] ResponseError),
+    #[error("bad response from server while checking file existence")]
+    Response(#[from] ResponseError),
 
     /// The response from the server when checking if the file exists was
     /// malformed.
     /// Maybe the server responded with a new format that isn't supported yet
     /// by this client.
-    #[fail(display = "received malformed authentication nonce")]
+    #[error("received malformed authentication nonce")]
     Malformed,
 }

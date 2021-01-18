@@ -8,6 +8,7 @@ use crate::api::request::{ensure_success, ResponseError};
 use crate::api::url::UrlBuilder;
 use crate::client::Client;
 use crate::file::remote_file::RemoteFile;
+use crate::ThisError;
 
 /// An action to fetch info of a shared file.
 ///
@@ -129,20 +130,20 @@ impl InfoResponse {
     }
 }
 
-#[derive(Fail, Debug)]
+#[derive(ThisError, Debug)]
 pub enum Error {
     /// An error occurred while preparing the action.
-    #[fail(display = "failed to prepare the action")]
-    Prepare(#[cause] PrepareError),
+    #[error("failed to prepare the action")]
+    Prepare(#[from] PrepareError),
 
     /// The given Send file has expired, or did never exist in the first place.
     /// Therefore the file could not be downloaded.
-    #[fail(display = "the file has expired or did never exist")]
+    #[error("the file has expired or did never exist")]
     Expired,
 
     /// An error has occurred while sending the info request to the server.
-    #[fail(display = "failed to send the file info request")]
-    Info(#[cause] InfoError),
+    #[error("failed to send the file info request")]
+    Info(#[from] InfoError),
 }
 
 impl From<NonceError> for Error {
@@ -151,12 +152,6 @@ impl From<NonceError> for Error {
             NonceError::Expired => Error::Expired,
             err => Error::Prepare(PrepareError::Auth(err)),
         }
-    }
-}
-
-impl From<PrepareError> for Error {
-    fn from(err: PrepareError) -> Error {
-        Error::Prepare(err)
     }
 }
 
@@ -169,31 +164,25 @@ impl From<ResponseError> for Error {
     }
 }
 
-impl From<InfoError> for Error {
-    fn from(err: InfoError) -> Error {
-        Error::Info(err)
-    }
-}
-
-#[derive(Debug, Fail)]
+#[derive(Debug, ThisError)]
 pub enum InfoDataError {
     /// Some error occurred while trying to wrap the info data in an
     /// owned object, which is required for authentication on the server.
     /// The wrapped error further described the problem.
-    #[fail(display = "")]
-    Owned(#[cause] DataError),
+    #[error("")]
+    Owned(#[from] DataError),
 }
 
-#[derive(Fail, Debug)]
+#[derive(ThisError, Debug)]
 pub enum PrepareError {
     /// Failed authenticating, needed to fetch the info
-    #[fail(display = "failed to authenticate")]
-    Auth(#[cause] NonceError),
+    #[error("failed to authenticate")]
+    Auth(#[from] NonceError),
 
     /// An error occurred while building the info data that will be
     /// send to the server.
-    #[fail(display = "invalid parameters")]
-    InfoData(#[cause] InfoDataError),
+    #[error("invalid parameters")]
+    InfoData(#[from] InfoDataError),
 }
 
 impl From<DataError> for PrepareError {
@@ -202,18 +191,18 @@ impl From<DataError> for PrepareError {
     }
 }
 
-#[derive(Fail, Debug)]
+#[derive(ThisError, Debug)]
 pub enum InfoError {
     /// Sending the request to fetch the file info failed.
-    #[fail(display = "failed to send file info request")]
+    #[error("failed to send file info request")]
     Request,
 
     /// The server responded with an error while fetching the file info.
-    #[fail(display = "bad response from server while fetching file info")]
-    Response(#[cause] ResponseError),
+    #[error("bad response from server while fetching file info")]
+    Response(#[from] ResponseError),
 
     /// Failed to decode the info response from the server.
     /// Maybe the server responded with data from a newer API version.
-    #[fail(display = "failed to decode info response")]
-    Decode(#[cause] ReqwestError),
+    #[error("failed to decode info response")]
+    Decode(#[from] ReqwestError),
 }

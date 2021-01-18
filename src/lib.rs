@@ -2,8 +2,6 @@
 extern crate arrayref;
 #[macro_use]
 extern crate derive_builder;
-#[macro_use]
-extern crate failure_derive;
 pub extern crate reqwest;
 #[macro_use]
 extern crate serde_derive;
@@ -22,4 +20,4 @@ pub mod file;
 mod io;
 pub mod pipe;
 
-pub use failure::Error;
+pub use thiserror::Error as ThisError;

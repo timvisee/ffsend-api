@@ -4,6 +4,7 @@ use crate::api;
 use crate::api::request::ensure_success;
 use crate::client::Client;
 use crate::config;
+use crate::ThisError;
 
 /// The Firefox Send version data endpoint.
 const VERSION_ENDPOINT: &str = "__version__";
@@ -153,20 +154,20 @@ impl VersionResponse {
     }
 }
 
-#[derive(Fail, Debug)]
+#[derive(ThisError, Debug)]
 pub enum Error {
     /// Sending the request to check whether the file exists failed.
-    #[fail(display = "failed to send request to fetch server version")]
+    #[error("failed to send request to fetch server version")]
     Request,
 
     /// The server was not able to respond with any version identifiable information, the server
     /// version is unknown.
-    #[fail(display = "failed to determine server version")]
+    #[error("failed to determine server version")]
     Unknown,
 
     /// The server responded with the given version string that is currently not supported and is
     /// unknown.
     /// This might be the result of a missing compiler feature for a given Firefox Send version.
-    #[fail(display = "failed to determine server version, unsupported version")]
+    #[error("failed to determine server version, unsupported version")]
     Unsupported(String),
 }
