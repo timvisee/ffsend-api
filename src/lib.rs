@@ -19,5 +19,3 @@ pub mod file;
 #[cfg(feature = "send3")]
 mod io;
 pub mod pipe;
-
-pub use thiserror::Error as ThisError;

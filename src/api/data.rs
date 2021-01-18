@@ -1,7 +1,7 @@
 use serde::Serialize;
+use thiserror::Error;
 
 use crate::file::remote_file::RemoteFile;
-use crate::ThisError;
 
 /// An owned data structure, that wraps generic data.
 /// This structure is used to send owned data to the Send server.
@@ -36,7 +36,7 @@ where
     }
 }
 
-#[derive(Debug, ThisError)]
+#[derive(Debug, Error)]
 pub enum Error {
     /// Missing owner token, which is required.
     #[error("missing owner token, must be specified")]

@@ -22,6 +22,7 @@ use reqwest::header::AUTHORIZATION;
 use reqwest::Error as ReqwestError;
 #[cfg(feature = "send3")]
 use serde_json;
+use thiserror::Error;
 use url::{ParseError as UrlParseError, Url};
 #[cfg(feature = "send3")]
 use websocket::{result::WebSocketError, OwnedMessage};
@@ -52,7 +53,6 @@ use crate::pipe::{
     prelude::*,
     progress::{ProgressPipe, ProgressReporter},
 };
-use crate::ThisError;
 
 /// A file upload action to a Send server.
 ///
@@ -567,7 +567,7 @@ impl PipeLen for Reader {
     }
 }
 
-#[derive(ThisError, Debug)]
+#[derive(Error, Debug)]
 pub enum Error {
     /// An error occurred while preparing a file for uploading.
     #[error("failed to prepare uploading the file")]
@@ -604,7 +604,7 @@ impl From<ReaderError> for Error {
     }
 }
 
-#[derive(ThisError, Debug)]
+#[derive(Error, Debug)]
 pub enum PrepareError {
     /// Failed to prepare the file metadata for uploading.
     #[error("failed to prepare file metadata")]
@@ -620,7 +620,7 @@ pub enum PrepareError {
     Client,
 }
 
-#[derive(ThisError, Debug)]
+#[derive(Error, Debug)]
 pub enum ReaderError {
     /// An error occurred while creating the file encryptor.
     #[error("failed to create file encryptor")]
@@ -632,7 +632,7 @@ pub enum ReaderError {
     Progress,
 }
 
-#[derive(ThisError, Debug)]
+#[derive(Error, Debug)]
 pub enum FileError {
     /// The given path, is not not a file or doesn't exist.
     #[error("the given path is not an existing file")]
@@ -643,7 +643,7 @@ pub enum FileError {
     Open(#[from] IoError),
 }
 
-#[derive(ThisError, Debug)]
+#[derive(Error, Debug)]
 pub enum UploadError {
     /// Failed to start or update the uploading progress, because of this the
     /// upload can't continue.

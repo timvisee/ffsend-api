@@ -1,10 +1,11 @@
+use thiserror::Error;
+
 use crate::api::data::{Error as DataError, OwnedData};
 use crate::api::nonce::{request_nonce, NonceError};
 use crate::api::request::{ensure_success, ResponseError};
 use crate::api::url::UrlBuilder;
 use crate::client::Client;
 use crate::file::remote_file::RemoteFile;
-use crate::ThisError;
 
 /// An action to delete a remote file.
 ///
@@ -75,7 +76,7 @@ impl DeleteData {
     }
 }
 
-#[derive(ThisError, Debug)]
+#[derive(Error, Debug)]
 pub enum Error {
     /// An error occurred while preparing the action.
     #[error("failed to prepare the action")]
@@ -100,7 +101,7 @@ impl From<NonceError> for Error {
     }
 }
 
-#[derive(Debug, ThisError)]
+#[derive(Debug, Error)]
 pub enum DeleteDataError {
     /// Some error occurred while trying to wrap the deletion data in an
     /// owned object, which is required for authentication on the server.
@@ -109,7 +110,7 @@ pub enum DeleteDataError {
     Owned(#[from] DataError),
 }
 
-#[derive(ThisError, Debug)]
+#[derive(Error, Debug)]
 pub enum PrepareError {
     /// Failed to authenticate
     #[error("failed to authenticate")]
@@ -121,7 +122,7 @@ pub enum PrepareError {
     DeleteData(#[from] DeleteDataError),
 }
 
-#[derive(ThisError, Debug)]
+#[derive(Error, Debug)]
 pub enum DeleteError {
     /// Sending the file deletion request failed.
     #[error("failed to send file deletion request")]

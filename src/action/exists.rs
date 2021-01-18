@@ -1,8 +1,9 @@
+use thiserror::Error;
+
 use crate::api::request::{ensure_success, ResponseError};
 use crate::api::url::UrlBuilder;
 use crate::client::Client;
 use crate::file::remote_file::RemoteFile;
-use crate::ThisError;
 
 /// An action to check whether a remote file exists.
 /// This aciton returns an `ExistsResponse`, that defines whether the file
@@ -103,7 +104,7 @@ impl Default for ExistsResponse {
     }
 }
 
-#[derive(ThisError, Debug)]
+#[derive(Error, Debug)]
 pub enum Error {
     /// Sending the request to check whether the file exists failed.
     #[error("failed to send request whether the file exists")]

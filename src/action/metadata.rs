@@ -4,6 +4,7 @@ use serde::{
     Deserialize, Deserializer,
 };
 use serde_json::{self, Value as JsonValue};
+use thiserror::Error;
 
 use super::exists::{Error as ExistsError, Exists as ExistsAction};
 use crate::api::nonce::{header_nonce, request_nonce, NonceError};
@@ -15,7 +16,6 @@ use crate::crypto::sig::signature_encoded;
 use crate::crypto::{self, api::MetadataError};
 use crate::file::metadata::Metadata as MetadataData;
 use crate::file::remote_file::RemoteFile;
-use crate::ThisError;
 
 /// An action to fetch file metadata.
 ///
@@ -256,7 +256,7 @@ impl<'a> MetadataResponse {
     }
 }
 
-#[derive(ThisError, Debug)]
+#[derive(Error, Debug)]
 pub enum Error {
     /// An error occurred while checking whether the file exists on the
     /// server.
@@ -294,7 +294,7 @@ impl From<NonceError> for Error {
     }
 }
 
-#[derive(ThisError, Debug)]
+#[derive(Error, Debug)]
 pub enum RequestError {
     /// Failed authenticating, in order to fetch the file data.
     #[error("failed to authenticate")]
@@ -305,7 +305,7 @@ pub enum RequestError {
     Meta(#[from] MetaError),
 }
 
-#[derive(ThisError, Debug)]
+#[derive(Error, Debug)]
 pub enum MetaError {
     /// An error occurred while computing the cryptographic signature used for
     /// decryption.

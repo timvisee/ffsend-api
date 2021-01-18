@@ -1,3 +1,5 @@
+use thiserror::Error;
+
 use crate::api::data::{Error as DataError, OwnedData};
 use crate::api::nonce::{request_nonce, NonceError};
 use crate::api::request::{ensure_success, ResponseError};
@@ -5,7 +7,6 @@ use crate::api::url::UrlBuilder;
 use crate::client::Client;
 use crate::crypto::key_set::KeySet;
 use crate::file::remote_file::RemoteFile;
-use crate::ThisError;
 
 /// An action to change a password of an uploaded Send file.
 ///
@@ -94,7 +95,7 @@ impl PasswordData {
     }
 }
 
-#[derive(ThisError, Debug)]
+#[derive(Error, Debug)]
 pub enum Error {
     /// An error occurred while preparing the action.
     #[error("failed to prepare setting the password")]
@@ -129,7 +130,7 @@ impl From<ResponseError> for Error {
     }
 }
 
-#[derive(ThisError, Debug)]
+#[derive(Error, Debug)]
 pub enum PrepareError {
     /// Failed authenticating, needed to set a new password.
     #[error("failed to authenticate")]
@@ -142,7 +143,7 @@ pub enum PrepareError {
     Data(#[from] DataError),
 }
 
-#[derive(ThisError, Debug)]
+#[derive(Error, Debug)]
 pub enum ChangeError {
     /// Sending the request to change the password failed.
     #[error("failed to send password change request")]

@@ -3,12 +3,12 @@ use openssl;
 #[cfg(feature = "crypto-ring")]
 use ring::aead;
 use serde_json;
+use thiserror::Error;
 
 #[cfg(feature = "crypto-openssl")]
 use crate::config::TAG_LEN;
 use crate::crypto::{b64, key_set::KeySet};
 use crate::file::metadata::Metadata;
-use crate::ThisError;
 
 /// Encrypt the given `metadata` object.
 ///
@@ -125,7 +125,7 @@ fn decrypt_aead(key_set: &KeySet, payload: &mut [u8]) -> Result<Vec<u8>, Error> 
     }
 }
 
-#[derive(ThisError, Debug)]
+#[derive(Error, Debug)]
 pub enum MetadataError {
     /// An error occurred while encrypting metadata.
     #[error("failed to encrypt file metadata")]
@@ -153,8 +153,7 @@ impl From<Error> for MetadataError {
     }
 }
 
-
-#[derive(ThisError, Debug)]
+#[derive(Error, Debug)]
 pub enum Error {
     /// An error occurred while decrypting the given plaintext.
     #[error("failed to encrypt given plaintext")]

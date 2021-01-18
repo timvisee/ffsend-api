@@ -1,6 +1,7 @@
 use std::cmp::max;
 
 use reqwest::Error as ReqwestError;
+use thiserror::Error;
 
 use crate::api::data::{Error as DataError, OwnedData};
 use crate::api::nonce::{request_nonce, NonceError};
@@ -8,7 +9,6 @@ use crate::api::request::{ensure_success, ResponseError};
 use crate::api::url::UrlBuilder;
 use crate::client::Client;
 use crate::file::remote_file::RemoteFile;
-use crate::ThisError;
 
 /// An action to fetch info of a shared file.
 ///
@@ -130,7 +130,7 @@ impl InfoResponse {
     }
 }
 
-#[derive(ThisError, Debug)]
+#[derive(Error, Debug)]
 pub enum Error {
     /// An error occurred while preparing the action.
     #[error("failed to prepare the action")]
@@ -164,7 +164,7 @@ impl From<ResponseError> for Error {
     }
 }
 
-#[derive(Debug, ThisError)]
+#[derive(Debug, Error)]
 pub enum InfoDataError {
     /// Some error occurred while trying to wrap the info data in an
     /// owned object, which is required for authentication on the server.
@@ -173,7 +173,7 @@ pub enum InfoDataError {
     Owned(#[from] DataError),
 }
 
-#[derive(ThisError, Debug)]
+#[derive(Error, Debug)]
 pub enum PrepareError {
     /// Failed authenticating, needed to fetch the info
     #[error("failed to authenticate")]
@@ -191,7 +191,7 @@ impl From<DataError> for PrepareError {
     }
 }
 
-#[derive(ThisError, Debug)]
+#[derive(Error, Debug)]
 pub enum InfoError {
     /// Sending the request to fetch the file info failed.
     #[error("failed to send file info request")]

@@ -3,12 +3,12 @@ extern crate regex;
 
 use self::chrono::{DateTime, Duration, Utc};
 use self::regex::Regex;
+use thiserror::Error;
 use url::{ParseError as UrlParseError, Url};
 
 use crate::api::url::UrlBuilder;
 use crate::config::SEND_DEFAULT_EXPIRE_TIME;
 use crate::crypto::b64;
-use crate::ThisError;
 
 /// A pattern for share URL paths, capturing the file ID.
 // TODO: match any sub-path?
@@ -309,7 +309,7 @@ impl RemoteFile {
     }
 }
 
-#[derive(Debug, ThisError)]
+#[derive(Debug, Error)]
 pub enum FileParseError {
     /// An URL format error.
     #[error("failed to parse remote file, invalid URL format")]

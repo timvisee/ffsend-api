@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use reqwest::{blocking::Response, header::AUTHORIZATION};
+use thiserror::Error;
 
 use super::metadata::{Error as MetadataError, Metadata as MetadataAction, MetadataResponse};
 use crate::api::request::{ensure_success, ResponseError};
@@ -21,7 +22,6 @@ use crate::pipe::{
     prelude::*,
     progress::{ProgressPipe, ProgressReporter},
 };
-use crate::ThisError;
 
 /// A file download action to a Send server.
 ///
@@ -254,7 +254,7 @@ impl<'a> Download<'a> {
     }
 }
 
-#[derive(ThisError, Debug)]
+#[derive(Error, Debug)]
 pub enum Error {
     /// An error occurred while fetching the metadata of the file.
     /// This step is required in order to succsessfully decrypt the
@@ -285,7 +285,7 @@ pub enum Error {
     File(String, #[source] FileError),
 }
 
-#[derive(ThisError, Debug)]
+#[derive(Error, Debug)]
 pub enum DownloadError {
     /// An error occurred while computing the cryptographic signature used for
     /// downloading the file.
@@ -315,7 +315,7 @@ pub enum DownloadError {
     // Verify,
 }
 
-#[derive(ThisError, Debug)]
+#[derive(Error, Debug)]
 pub enum FileError {
     /// An error occurred while creating or opening the file to write to.
     #[error("failed to create or replace the file")]

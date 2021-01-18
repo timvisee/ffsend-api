@@ -1,8 +1,8 @@
 use reqwest::{blocking::Response, StatusCode};
+use thiserror::Error;
 
 use crate::config::{HTTP_STATUS_EXPIRED, HTTP_STATUS_UNAUTHORIZED};
 use crate::ext::status_code::StatusCodeExt;
-use crate::ThisError;
 
 /// Ensure the given response is successful. If it isn't, a corresponding `ResponseError` is returned.
 pub fn ensure_success(response: &Response) -> Result<(), ResponseError> {
@@ -28,7 +28,7 @@ pub fn ensure_success(response: &Response) -> Result<(), ResponseError> {
     Err(ResponseError::OtherHttp(status, status.err_text()))
 }
 
-#[derive(ThisError, Debug)]
+#[derive(Error, Debug)]
 pub enum ResponseError {
     /// This request lead to an expired file, or a file that never existed.
     #[error("this file has expired or did never exist")]

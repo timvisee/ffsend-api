@@ -1,3 +1,4 @@
+use thiserror::Error;
 use url::Url;
 
 use crate::api;
@@ -5,7 +6,6 @@ use crate::api::request::ensure_success;
 use crate::client::Client;
 #[cfg(feature = "send3")]
 use crate::config;
-use crate::ThisError;
 
 /// The Firefox Send version data endpoint.
 const VERSION_ENDPOINT: &str = "__version__";
@@ -155,7 +155,7 @@ impl VersionResponse {
     }
 }
 
-#[derive(ThisError, Debug)]
+#[derive(Error, Debug)]
 pub enum Error {
     /// Sending the request to check whether the file exists failed.
     #[error("failed to send request to fetch server version")]

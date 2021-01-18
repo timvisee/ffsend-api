@@ -1,3 +1,5 @@
+use thiserror::Error;
+
 use crate::api::data::{Error as DataError, OwnedData};
 use crate::api::nonce::{request_nonce, NonceError};
 use crate::api::request::{ensure_success, ResponseError};
@@ -5,7 +7,6 @@ use crate::api::url::UrlBuilder;
 use crate::api::Version;
 use crate::client::Client;
 use crate::file::remote_file::RemoteFile;
-use crate::ThisError;
 
 /// The minimum allowed number of downloads, enforced by the server.
 // TODO: remove parameter, use from config
@@ -193,7 +194,7 @@ impl Default for ParamsData {
     }
 }
 
-#[derive(ThisError, Debug)]
+#[derive(Error, Debug)]
 pub enum Error {
     /// An error occurred while preparing the action.
     #[error("failed to prepare setting the parameters")]
@@ -228,7 +229,7 @@ impl From<ResponseError> for Error {
     }
 }
 
-#[derive(Debug, ThisError)]
+#[derive(Debug, Error)]
 pub enum ParamsDataError {
     /// The number of downloads is invalid, as it was out of the allowed
     /// bounds. See `PARAMS_DOWNLOAD_MIN` and `PARAMS_DOWNLOAD_MAX`.
@@ -243,7 +244,7 @@ pub enum ParamsDataError {
     Owned(#[from] DataError),
 }
 
-#[derive(ThisError, Debug)]
+#[derive(Error, Debug)]
 pub enum PrepareError {
     /// Failed authenticating, needed to change the parameters.
     #[error("failed to authenticate")]
@@ -261,7 +262,7 @@ impl From<DataError> for PrepareError {
     }
 }
 
-#[derive(ThisError, Debug)]
+#[derive(Error, Debug)]
 pub enum ChangeError {
     /// Sending the request to change the parameters failed.
     #[error("failed to send parameter change request")]

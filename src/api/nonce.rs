@@ -2,12 +2,12 @@ use reqwest::{
     blocking::Response,
     header::{HeaderName, WWW_AUTHENTICATE},
 };
+use thiserror::Error;
 use url::Url;
 
 use crate::api::request::{ensure_success, ResponseError};
 use crate::client::Client;
 use crate::crypto::b64;
-use crate::ThisError;
 
 /// The name of the header the nonce is delivered in.
 const HEADER_NONCE: HeaderName = WWW_AUTHENTICATE;
@@ -42,7 +42,7 @@ pub fn header_nonce(response: &Response) -> Result<Vec<u8>, NonceError> {
     .map_err(|_| NonceError::MalformedNonce)
 }
 
-#[derive(ThisError, Debug)]
+#[derive(Error, Debug)]
 pub enum NonceError {
     /// Sending the request to fetch a nonce failed,
     /// as the file has expired or did never exist.
