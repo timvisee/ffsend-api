@@ -1,6 +1,6 @@
 use std::fmt;
 
-use version_compare::{CompOp, VersionCompare};
+use version_compare::Cmp;
 
 /// Firefox Send API version selector.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -36,10 +36,8 @@ impl Version {
         #[cfg(feature = "send2")]
         {
             // Test the lower and upper version bounds
-            let lower =
-                VersionCompare::compare_to(stripped, "2.0", &CompOp::Ge).map_err(|_| ver)?;
-            let upper =
-                VersionCompare::compare_to(stripped, "3.0", &CompOp::Lt).map_err(|_| ver)?;
+            let lower = version_compare::compare_to(stripped, "2.0", Cmp::Ge).map_err(|_| ver)?;
+            let upper = version_compare::compare_to(stripped, "3.0", Cmp::Lt).map_err(|_| ver)?;
             if lower && upper {
                 return Ok(Version::V2);
             }
@@ -49,10 +47,8 @@ impl Version {
         #[cfg(feature = "send3")]
         {
             // Test the lower and upper version bounds
-            let lower =
-                VersionCompare::compare_to(stripped, "3.0", &CompOp::Ge).map_err(|_| ver)?;
-            let upper =
-                VersionCompare::compare_to(stripped, "4.0", &CompOp::Lt).map_err(|_| ver)?;
+            let lower = version_compare::compare_to(stripped, "3.0", Cmp::Ge).map_err(|_| ver)?;
+            let upper = version_compare::compare_to(stripped, "4.0", Cmp::Lt).map_err(|_| ver)?;
             if lower && upper {
                 return Ok(Version::V3);
             }
