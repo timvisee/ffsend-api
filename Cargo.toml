@@ -18,9 +18,6 @@ categories = [
 edition = "2018"
 build = "build.rs"
 
-[badges]
-gitlab = { repository = "timvisee/ffsend-api", branch = "master" }
-
 [lib]
 name = "ffsend_api"
 path = "src/lib.rs"
