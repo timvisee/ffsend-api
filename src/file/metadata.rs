@@ -93,6 +93,14 @@ impl Metadata {
         }
     }
 
+    /// Get the files manifest
+    pub fn manifest(&self) -> Option<&Manifest> {
+        match self {
+            Metadata::V2 { .. } => None,
+            Metadata::V3 { manifest, .. } => Some(&manifest),
+        }
+    }
+
     /// Get the input vector if set.
     ///
     /// For Firefox Send v3 and above `None` is returned as no input vector is used.
@@ -145,13 +153,18 @@ impl Manifest {
     pub fn from_file(name: String, mime: String, size: u64) -> Self {
         Self::from(vec![ManifestFile::from(name, mime, size)])
     }
+
+    // Get files part of the share
+    pub fn files<'a>(self: &'a Self) -> &'a Vec<ManifestFile> {
+        &self.files
+    }
 }
 
 /// Metadata manifest file, used in Send v3.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ManifestFile {
     /// The file name.
-    name: String,
+    pub name: String,
 
     /// The file mimetype.
     /// TODO: can we use the `Mime` type here?
@@ -159,7 +172,7 @@ pub struct ManifestFile {
     mime: String,
 
     /// The file size.
-    size: u64,
+    pub size: u64,
 }
 
 impl ManifestFile {
