@@ -454,12 +454,21 @@ impl UploadResponse {
         key: &KeySet,
         expiry_time: Option<DateTime<Utc>>,
     ) -> Result<RemoteFile, UploadError> {
+        let url = Url::parse(&self.url).or_else(|err| {
+            if err == UrlParseError::RelativeUrlWithoutBase {
+                // Some server responds with a URL without scheme, or even a relative URL
+                if let Some(domain) = &host.domain() {
+                    return host.join(self.url.strip_prefix(domain).unwrap_or(&self.url));
+                }
+            }
+            Err(err)
+        })?;
         Ok(RemoteFile::new(
             self.id,
             Some(Utc::now()),
             expiry_time,
             host,
-            Url::parse(&self.url)?,
+            url,
             key.secret().to_vec(),
             Some(self.owner_token),
         ))
